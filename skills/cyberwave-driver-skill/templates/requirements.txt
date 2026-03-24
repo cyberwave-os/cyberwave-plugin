@@ -1,0 +1,4 @@
+cyberwave-sdk>=0.1.0
+
+# Add hardware-specific Python packages below, e.g.:
+# pyserial>=3.5

@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "cyberwave": {
+      "url": "https://mcp.cyberwave.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${CYBERWAVE_API_KEY}"
+      }
+    }
+  }
+}

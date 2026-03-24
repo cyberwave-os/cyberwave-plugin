@@ -1,0 +1,5 @@
+{
+  "name": "cyberwave",
+  "description": "Cyberwave is the fastest way to build a Physical AI application. Connect to any robot and sensor.  Test in simulation. Deploy in two clicks. It is composed by an MCP and two skills: the cyberwave skill to develop applications, and the cyberwave-driver skill to help you write new drivers and integrate new hardware.",
+  "version": "0.1.0"
+}

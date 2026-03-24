@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "__DRIVER_NAME__"
+version = "0.1.0"
+description = "__DESCRIPTION__"
+requires-python = ">=3.11"
+dependencies = [
+    "cyberwave-sdk>=0.1.0",
+]
+authors = [
+    {name = "__AUTHOR__"},
+]
+
+[project.scripts]
+driver = "__PACKAGE_NAME__.main:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["__PACKAGE_NAME__*"]
