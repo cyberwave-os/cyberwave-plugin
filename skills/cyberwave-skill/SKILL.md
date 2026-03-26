@@ -122,12 +122,12 @@ from cyberwave import Cyberwave
 cw = Cyberwave()  # reads CYBERWAVE_API_TOKEN from environment
 ```
 
-**Simulation vs real-world** — control where commands are sent:
+**Simulation vs live** — control where commands are sent:
 
 ```python
 cw = Cyberwave(mode="simulation")  # safe for development
 cw.affect("simulation")            # subsequent commands target the digital twin
-# cw.affect("real-world")         # switch to physical robot when ready
+# cw.affect("live")               # switch to physical robot when ready
 ```
 
 Individual calls can still override the target with an explicit `source_type` argument.
