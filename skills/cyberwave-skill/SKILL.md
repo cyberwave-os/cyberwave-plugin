@@ -29,6 +29,7 @@ The cyberwave plugin ships with an MCP server that is automatically configured w
 - Create an environment if the user doesn't have one
 - Search the asset catalog for the robots and sensors they mention
 - Add the matching digital twins to the environment and position them
+- If the user uploads a new URDF ZIP as an asset via MCP (`cw_create_urdf_asset_from_zip`), immediately define or update capabilities with `cw_set_asset_capabilities` so the platform can infer supported actions/sensors correctly
 
 Once the environment is ready, move on to Step 1.
 
@@ -476,6 +477,8 @@ Ask the user:
 
 - **Always recommend the Python SDK first** unless the user has a specific reason to use the APIs directly or needs C++.
 - **Ask remote vs on-device early** — the two Python sub-paths use different SDK features and mixing them up creates confusion. Clarify this before writing any code.
+- **After URDF asset creation, set capabilities** — if you create an asset from URDF ZIP in MCP, call `cw_set_asset_capabilities` next. Capabilities are stored in the universal schema at `/extensions/cyberwave/capabilities`.
+- **Reference capability docs when needed** — use the Digital Twins overview documentation for capability semantics and expected fields before proposing values.
 - **Driver vs on-device application** — if the user wants to bridge new hardware to Cyberwave (read hardware state → publish as twin metadata), that is a driver, not an application. Redirect them to `/cyberwave-driver`.
 - **`source_type="sim"` is safe for development** — recommend it while the user is getting started so they don't accidentally send commands to real hardware.
 - **FFMPEG and camera extras are on-device only** — only needed for `start_streaming()` / `stream_video_background()`. Remote applications that use `capture_frame()` do not need them.
