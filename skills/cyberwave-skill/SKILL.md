@@ -27,7 +27,8 @@ Wait for their answer, then proceed as follows.
 The cyberwave plugin ships with an MCP server that is automatically configured when the plugin is installed. If it is active, you will have tools from the `cyberwave` MCP server available (e.g. to search the catalog, create environments, add twins). Use them to:
 
 - Create an environment if the user doesn't have one
-- Search the asset catalog for the robots and sensors they mention
+- Call `cw_list_primitives` to see all curated catalog assets with a short alias (e.g. `camera`, `lidar`). These primitives can be added directly by alias via `cw_add_twin_to_environment` — no need to search the full catalog first.
+- Search the asset catalog for the robots and sensors they mention (use `cw_search_catalog` for broader queries)
 - Add the matching digital twins to the environment and position them
 - If the user uploads a new URDF ZIP as an asset via MCP (`cw_create_urdf_asset_from_zip`), immediately define or update capabilities with `cw_set_asset_capabilities` so the platform can infer supported actions/sensors correctly
 
@@ -477,6 +478,7 @@ Ask the user:
 
 - **Always recommend the Python SDK first** unless the user has a specific reason to use the APIs directly or needs C++.
 - **Ask remote vs on-device early** — the two Python sub-paths use different SDK features and mixing them up creates confusion. Clarify this before writing any code.
+- **Use `cw_list_primitives` before `cw_search_catalog`** — when the user wants to add common sensors or generic objects (camera, lidar, etc.) to an environment, call `cw_list_primitives` first. Primitives are curated public catalog assets with a short alias and can be added immediately without a search round-trip.
 - **After URDF asset creation, set capabilities** — if you create an asset from URDF ZIP in MCP, call `cw_set_asset_capabilities` next. Capabilities are stored in the universal schema at `/extensions/cyberwave/capabilities`.
 - **Reference capability docs when needed** — use the Digital Twins overview documentation for capability semantics and expected fields before proposing values.
 - **Driver vs on-device application** — if the user wants to bridge new hardware to Cyberwave (read hardware state → publish as twin metadata), that is a driver, not an application. Redirect them to `/cyberwave-driver`.
