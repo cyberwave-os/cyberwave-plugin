@@ -344,7 +344,7 @@ Use the Cyberwave platform via its two raw APIs. This works in any language.
 
 ### C1 — Authentication
 
-All REST requests require a Bearer token. Generate your API key from your profile page at [app.cyberwave.com](https://app.cyberwave.com) and include it in every request:
+All REST requests require a Bearer token. Generate your API key from your profile page at [cyberwave.com](https://cyberwave.com) and include it in every request:
 
 ```
 Authorization: Bearer YOUR_API_KEY
