@@ -178,6 +178,26 @@ if __name__ == "__main__":
 
 ---
 
+## Reading twin & sensor identity from the twin JSON
+
+Treat `CYBERWAVE_TWIN_JSON_FILE` (TwinSchema + nested `asset` AssetSchema) as the **source of truth for twin and sensor identity** and per-device runtime config. Read it once at startup — never hardcode sensor names, frames, or device paths, and never read identity from your driver's own hardware/ROS config.
+
+**Sensors.** Iterate the sensor list, preferring the normalized shape that already carries an `id`:
+`capabilities.sensors` → `asset.capabilities.sensors` → `universal_schema.sensors` → `asset.universal_schema.sensors` → `metadata._production_capabilities.sensors`. Each sensor has:
+- `id` (fall back to `name`) — the identity a stream/recording is keyed on (e.g. the WebRTC `sensor` field).
+- `type` — normalize `camera`/`rgb_camera`/`rgbd` → `rgb`, `depth_camera` → `depth`.
+- `parent_link` — the frame the sensor is mounted on (there is **no** `link`/`frame_id`/`mount` key).
+
+**Device selection.** Honor, in order: `CYBERWAVE_METADATA_VIDEO_DEVICE` (env, injected by Edge Core) > `metadata.sensors_devices[sensor_id]` > the `cameras` block in `edge.json`/`cameras.json` (`twin_to_device[twin_uuid]` → `devices[index].primary_path`).
+
+**Sibling files** in the mounted config dir (`/app/.cyberwave`, bind-mounted read-only): `edge.json` (edge record + camera selection), `environment.json` (environment UUID + selected twins), `cameras.json` (device map), `fingerprint.json` (this edge's hardware id). Cross-check `metadata.edge_fingerprint` against `fingerprint.json`, and `environment_uuid` against `environment.json`.
+
+**Framework-vs-twin frame mismatch.** If your runtime framework (e.g. ROS TF) uses a **different** link name than the twin's `parent_link`, keep the framework's link name as a documented constant on the framework side and **bridge** it (e.g. a static transform framework_link → twin_frame). Do not push the framework name into the twin, and do not hardcode identity into your hardware/device config.
+
+**Keep it in one place.** Centralize all `CYBERWAVE_*` env + JSON-file reading in a single module that projects a small immutable config object (parse once, O(1) retrieval). Anything you read should be logged so it can't be silently dropped. Twin JSON owns identity + per-device runtime config; hardware/protocol/framework config lives in your driver's own config, **not** the twin.
+
+---
+
 ## Step 3 — Orient the user in the generated code
 
 After scaffold + DriverBase alignment, tour these files:
