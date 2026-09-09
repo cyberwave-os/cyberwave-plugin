@@ -9,3 +9,4 @@ services:
       - /tmp/cyberwave-twin.json:/tmp/cyberwave-twin.json
     environment:
       CYBERWAVE_TWIN_JSON_FILE: /tmp/cyberwave-twin.json
+    restart: on-failure

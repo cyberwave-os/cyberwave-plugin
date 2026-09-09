@@ -12,4 +12,4 @@ COPY . .
 
 ENV PYTHONUNBUFFERED=1
 
-ENTRYPOINT ["python", "-m", "__PACKAGE_NAME__.main"]
+ENTRYPOINT ["python", "-m", "__PACKAGE_NAME__"]

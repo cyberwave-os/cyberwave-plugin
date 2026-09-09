@@ -14,8 +14,8 @@ allowing you to monitor and control the device from the Cyberwave dashboard and 
 ## Local development
 
 ```bash
-# 1. Install the Cyberwave CLI and log in
-pip install cyberwave
+# 1. Install the Cyberwave SDK and CLI, then log in
+pip install cyberwave cyberwave-cli
 cyberwave login
 
 # 2. Create a dev twin and write the .env (replace <registry-id> with your asset)

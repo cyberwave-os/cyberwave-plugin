@@ -20,9 +20,14 @@ class HardwareClient:
         logger.info("HardwareClient.connect() — replace with real implementation")
 
     def read_state(self) -> dict[str, Any]:
-        # TODO: poll hardware and return a dict of state fields to merge into the twin.
+        # TODO: poll hardware and return a compact telemetry/state snapshot.
         # Example: return {"battery_pct": 87, "status": "idle"}
         return {}
+
+    def perform_action(self, envelope: dict[str, Any]) -> None:
+        # TODO: validate the command payload and hardware limits, then perform
+        # exactly one bounded action.
+        logger.info("HardwareClient.perform_action(%s) — replace with implementation", envelope)
 
     def disconnect(self) -> None:
         # TODO: close connection gracefully

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Cyberwave"
+  short_description: "Build and operate Physical AI systems"
+  brand_color: "#6C5CE7"
+  default_prompt: "Use $cyberwave to create and verify a robot environment in simulation."
+policy:
+  allow_implicit_invocation: true
