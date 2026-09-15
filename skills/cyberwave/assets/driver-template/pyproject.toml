@@ -8,14 +8,14 @@ version = "0.1.0"
 description = "__DESCRIPTION__"
 requires-python = ">=3.11"
 dependencies = [
-    "cyberwave-sdk>=0.1.0",
+    "cyberwave",
 ]
 authors = [
     {name = "__AUTHOR__"},
 ]
 
 [project.scripts]
-driver = "__PACKAGE_NAME__.main:main"
+driver = "__PACKAGE_NAME__.__main__:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
