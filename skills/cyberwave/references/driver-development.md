@@ -143,6 +143,14 @@ Follow the public SDK's [fake IMU driver example](https://github.com/cyberwave-o
 
 Treat `CYBERWAVE_TWIN_JSON_FILE` plus sibling edge/environment/fingerprint files as the source of truth for twin, sensor, and binding identity. Parse once into a small immutable config object.
 
+For camera and USB-audio hardware identity, use top-level
+`metadata.serial_number` (exported as `CYBERWAVE_METADATA_SERIAL_NUMBER`), not a
+sensor parameter or a device index. Keep serials as strings to preserve leading
+zeroes. A serial pin must fail rather than substitute another physical unit.
+Linux UVC resolution relies on `/dev/v4l/by-id` and USB audio resolution on
+`/dev/snd/by-id`; declare the required device node and bind-mount the relevant
+host tree when Edge Core is not launching the container for you.
+
 Sensor lookup order:
 
 1. `capabilities.sensors`

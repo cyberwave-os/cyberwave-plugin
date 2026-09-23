@@ -47,7 +47,10 @@ remaining setup instead of creating a replacement.
 
 ## Trigger and monitor
 
-1. Confirm the workflow UUID, runtime, target environment/twin, and inputs.
+1. Confirm the workflow UUID, runtime, target environment/twin, and inputs. Inspect
+   the Environment's `control_plane_access`: `direct_control` forbids workflow
+   execution through MCP/A2A, while `workflows` and
+   `direct_control_and_workflows` allow it.
 2. Preview with `cw_trigger_workflow(execute=false)`.
 3. Trigger only when execution was requested.
 4. Capture the returned run UUID.
@@ -57,6 +60,20 @@ remaining setup instead of creating a replacement.
 Simulation runtime failures, including startup failures, appear in the environment's Simulate view. Check that view and the recorded run error when diagnosing a simulated workflow.
 
 Do not repeatedly trigger a workflow because status is slow or unknown. Verify the existing run first.
+
+Workflow authors can disable same-workflow concurrency (the default) and name
+same-environment workflows that block a new run. A trigger rejected with the
+`workflow_concurrency` conflict is an intentional safety gate: report the
+blocking workflow/run when the response exposes it and wait or cancel it; do not
+retry around the policy. A generic incompatible-workflow conflict may refer to a
+workflow the caller cannot read; do not infer or disclose its identity. Remove
+incoming and outgoing incompatible-workflow references before moving a workflow
+to a different environment.
+
+Concurrency admission applies to cloud-dispatched triggers, not telemetry from
+independently started edge runs. Already-started edge runs remain recorded even
+when they overlap; do not interpret a visible run as proof that the concurrency
+gate approved it.
 
 The central **Process** view (below the scene in Live and Simulation) and
 `cw_get_workflow_run` use the same
