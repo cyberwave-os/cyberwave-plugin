@@ -37,6 +37,12 @@ Inspect the plan for:
 
 Planning never authorizes motion.
 
+Before dispatch, inspect the Environment's `control_plane_access` policy.
+`workflows` forbids direct twin dispatch through MCP/A2A;
+`direct_control` and `direct_control_and_workflows` permit it. A workflows-only
+policy still allows an authorized workflow's nodes to command twins. Do not work
+around a policy denial with a lower-level control tool.
+
 ## Environment assistant handoff
 
 In the environment UI, keep using the same assistant conversation across Edit,
