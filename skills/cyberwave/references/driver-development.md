@@ -117,7 +117,7 @@ command_topic = TopicSpec(
 iface.add_listener(
     command_topic,
     CallbackGroup(callback=self._on_device_action),
-    protocol=ProtocolArgs(source_types=["tele", "live", "edge"]),
+    protocol=ProtocolArgs(source_types=["tele", "edge"]),
     command=CommandArgs(
         name="device_action",
         description="Perform one bounded device action",
@@ -127,7 +127,20 @@ iface.add_listener(
 
 Bind exact `CommandArgs.name` values. Do not route commands with keyword heuristics. Validate payload shape and hardware bounds before actuation.
 
+Declare repeat behavior with a boolean `continuous`: explicit `false` keeps a light, gripper or other one-shot command from repeating even if an older input preset says otherwise. Omission retains legacy preset behavior. Declare accepted `source_types` on each driver input topic. These describe that driver, not every execution target: inspect the active simulation/runtime contract separately, rather than inferring simulation availability from the hardware source list. The driver keyboard guide and dispatcher exclude undeclared commands, mismatched actuations and invalid typed arguments while retaining the saved mapping for review. Reuse one input template with capability-scoped mappings rather than creating a controller per device feature; saved action mappings still require supported runtime activation.
+
+Every message covered by the shared v1 transport envelope carries `source_type`
+as a top-level field. Use only the centralized vocabulary: `edge`,
+`edge_leader`, `edge_follower`, `tele`, `edit`, `sim`, or `sim_tele`. Domain
+payload fields remain alongside it; do not introduce a nested envelope.
+
+When helping configure an input, inspect the declared command parameters as well as its name. A gripper command may require an action choice; a trajectory requires joint names and ordered points. Preserve saved parameters when changing a key or movement amount. Use the existing mapping editor for declared parameter fields rather than making a parallel form. A saved key binding is configuration evidence only: validate hardware bounds, trajectory semantics and device readiness in the driver before execution. A Cartesian pose still requires real IK/planning and collision support.
+
+For a command that needs parameters, use `CommandArg` with keyword-only `type`, `required`, `enum`, bounds or `min_items` in a supporting SDK release. For example, `CommandArg("action", type="string", required=True, enum=("grip", "release"))` declares a required gripper choice. Keep `CommandArg(name, default, unit)` for existing untyped integrations until explicitly migrated. Export through the existing registry and submit through `twin.driver.set_schema`; avoid the deprecated local compiler. The server validates the declaration. Do not guess required values when generating keyboard mappings: leave the command available for setup and explain which parameters are missing. Complete setup and driver readiness are separate. To change an existing typed command contract, refresh the twin, inspect the current schema, retain `twin.driver.get_revision()`, and pass that token as `expected_revision` to `set_schema`. A 409 means the reviewed target changed or the request omitted its revision; review again instead of retrying with an automatically refreshed token. An old untyped refresh must not erase adopted constraints. The revision covers the loaded twin, not immutable driver history.
+
 For publishers, declare a typed `TopicSpec` and `PublisherArgs(rate_hz=...)`. Use units and source types in `ProtocolArgs`. Do not duplicate the built-in driver telemetry publisher.
+
+Commands accepting alternative payloads can declare `CommandArgs(required_any_of=("pwm", "io4"), args=(...))` in a supporting release. Declare each referenced name as a typed `CommandArg`. The registry exports the same `required_any_of` list as YAML; the server compiler validates it. Do not add defaults merely to satisfy the group, since a driver's parameter precedence can change an existing command's meaning.
 
 ## MQTT and Zenoh
 

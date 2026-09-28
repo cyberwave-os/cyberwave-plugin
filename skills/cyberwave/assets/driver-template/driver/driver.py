@@ -64,7 +64,7 @@ class __CLASS_NAME__(BaseDriver):
         iface.add_listener(
             command_topic,
             CallbackGroup(callback=self._on_device_action),
-            protocol=ProtocolArgs(source_types=["tele", "live", "edge"]),
+            protocol=ProtocolArgs(source_types=["tele", "edge"]),
             command=CommandArgs(
                 name="device_action",
                 description="Perform one bounded device action",

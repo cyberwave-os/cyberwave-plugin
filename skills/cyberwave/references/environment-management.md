@@ -64,6 +64,8 @@ of the request; the same flow applies during creation and editing.
 
 Prefer `cw_edit_environment` for normal multi-object or intent-level scene edits. Copy current `scene_edit_operation_hint` values from catalog search results, give every non-ground object and waypoint an explicit position, and create support surfaces before operations that snap to them.
 
+For an ordinary world-space twin move, use a twin update/transform operation with top-level `position` and `rotation`; omit `attachment`. Use `attachment` only to dock the moving twin to a different parent twin and never set `parent_twin_uuid` to the moving `twin_uuid` itself.
+
 Use atomic tools when the task is narrow or the intent-level tool is unavailable:
 
 - `cw_add_twin_to_environment`
@@ -77,7 +79,21 @@ Use atomic tools when the task is narrow or the intent-level tool is unavailable
 
 For catalog twins, use the `registry_id` returned by current MCP catalog search because that MCP contract explicitly accepts it. Give the twin an explicit position during creation when possible.
 
+Twin creation inherits saved asset service settings without cloning input templates.
+When using the HTTP fallback, `POST /api/v1/twins` returns
+`control_setup_inherited: true` if it adopted those settings. A null primary
+`controller_policy_uuid` then does not mean inputs are missing: read the twin's
+control profile before proposing changes. Do not attach an arbitrary legacy
+keyboard after creation; that can invalidate the inherited setup. Explicit asset
+defaults remain supported. On older servers without this field, inspect the
+returned assignment and control profile instead of assuming inheritance.
+
 Use `snap`/`snap_target` against exact existing IDs for floors, tables, racks, or walls. Use overlap avoidance/clearance options where available instead of estimating repeated nudges.
+
+Keep template-specific scalar sizes under `parameters` (for example,
+`parameters: {"size": 0.15}` for a fiducial marker). Top-level `size`/`dimensions`
+describe a three-dimensional object transform and require a vector or dimensions
+object; they are not substitutes for the template's scalar input.
 
 ### Procedural walls and stairs
 
@@ -92,6 +108,8 @@ Use schema-provided presets as starting points, then validate the actual scene. 
 
 ### Groups and arrangement
 
+Organize related parts of a newly authored scene into meaningful named groups for sidebar navigation. Create the parts first, inspect their returned IDs and refresh the environment revision, then group them in a separate batch: targets must already exist when the hierarchy planner runs. Group, ungroup, translate and layout intents use the **environment** revision; individual object edits use the **object** revision. Preserve existing groups during focused edits and verify the resulting hierarchy. Leave unrelated singletons ungrouped; do not create filler objects just to meet the two-target minimum.
+
 Use the existing `cw_edit_environment` operation list for hierarchy and layout; do not create replacement twins or rewrite the environment's full settings. Inspect the current tool schema before using these operations:
 
 - `group`: provide a stable `id`, a `name`, and at least two exact `targets` (`{kind, id}`). Targets may include existing groups; use `parent_id` only for an existing parent.
@@ -103,11 +121,13 @@ Horizontal means X, vertical means world height Z, and depth means Y—not scree
 
 Spatial feedback sizes use world X/Y/Z as well: a horizontal floor has a small Z extent. Do not swap depth and height when interpreting the returned bounds.
 
+For painted navigation lanes, use `cyberwave/floor_marker`, not a thin dynamic box. When converting an existing object, explicitly update `properties.fixed_base` to `true` and verify the stored flag and compiled physics: an existing `false` overrides the template's static default. `cw_edit_environment` accepts this property in its update properties object or as a compact top-level field, and forwards it on creation too. Preserve geometry and appearance during a physics-only edit. A small solid box remains an obstacle regardless of its name. Check endpoint clearance and the planned route before calling an inspection setup ready; preserve explicit no-go policies. Navigation bounds enclose each rotated collision sub-box separately, so an open perimeter path is not treated as a filled yard-sized box.
+
 Read the current environment revision and supply `expected_revision` when required by the tool. On a conflict, refresh and replan; do not blindly replay a stale hierarchy. Preview before execution when supported, then re-read transforms and render a side/isometric view to verify placement, especially for hollow or irregular objects whose bounding boxes include empty space. Scene editing is not live robot control.
 
 ## Validate spatially
 
-When missing physical/sensor/gripper data blocks simulation, use the [simulation preparation guidance](asset-and-driver-development.md#simulation-preparation). `cw_prepare_simulation_asset` works for both catalog twins and procedural objects. Queue only user-authorized preparation and show the object’s **Simulation readiness** panel; do not imply that preparation has changed a running simulation or verified real-world behavior.
+When missing physical/sensor/gripper data blocks simulation, use the [simulation preparation guidance](asset-and-driver-development.md#simulation-preparation). `cw_prepare_simulation_asset` supports inspect, prepare, status and preview-first apply for both catalog twins and procedural objects. Queue only user-authorized preparation, review the returned changes, and apply explicitly while stopped; do not imply that preparation has changed a running simulation or verified real-world behavior.
 
 After material edits:
 
@@ -117,6 +137,30 @@ After material edits:
 4. Correct unintended intersections, floating objects, blocked routes, or hidden important assets.
 
 One top/isometric view can miss vertical problems. Use front/side or perspective when height and stacking matter.
+
+Reuse a healthy overview after an edit, then request one complementary view;
+reserve a third focused view for unresolved ambiguity. The existing preview tool
+accepts `view`, `orbit_azimuth_deg`, `orbit_elevation_deg`, `focus_twin_uuid`,
+`camera_position`, `target`, `distance` or `zoom`. Reuse identical camera arguments
+for before/after comparisons. Prefer the layout analyzer's inexpensive
+`views=["horizontal", "front", "side"]` checks before another rendered view.
+Do not render a full sweep after every small edit or mix old and current views
+as if they show the same scene state. A schematic fallback is diagnostic only.
+
+Check each component against its intended support: elevated equipment may be
+mounted on a base, table or another component. Do not ground-snap every part.
+For appearance-only edits, verify that dimensions and pose stayed unchanged.
+
+## Coordinate automation from the environment
+
+Keep the environment assistant as the user's single point of coordination.
+Delegate workflow composition through the existing workflow tools with exact
+scene, twin, waypoint and sensor IDs; keep the saved workflow ID when repairing
+setup. Inspect available control surfaces rather than inventing controller
+compatibility or key mappings. A manual workflow trigger, a controller policy
+and a keyboard/gamepad input binding are separate configuration outcomes.
+Report each as configured, pending or unsupported. Saving a workflow does not
+mean that input bindings exist or that the workflow has run.
 
 ## Deletion
 
@@ -133,3 +177,32 @@ Report:
 - important transforms,
 - analysis/render result,
 - and any unresolved visual or capability warning.
+
+## Reusable use-case templates
+
+Use the existing environment template and clone flows when a relevant setup exists. In the frontend, Environment settings exposes `is_template` and use-case names stored as `use-case:<slug>` tags. Preserve unrelated tags and existing visibility. Template status does not make a private environment public.
+
+The template gallery and schematic twin tour are discovery/preview tools. Cloning creates a separate environment through the existing clone endpoint; it does not establish physical hardware readiness or run workflows. Do not invent a new MCP template command: inspect currently available tools, or use the authorized frontend/REST flow when a corresponding MCP operation is absent.
+
+
+## Preparing robot-training scenes and editable assets
+
+Use the existing environment assistant draft actions **Prepare a training scene**
+and **Create an object with the agent** in edit mode. Resolve robot, task, desired
+interaction, workspace and environment first. Search the catalog, use procedural
+primitives for simple targets/supports, then `cw_request_asset_generation` for a
+supported articulated/procedural object. Use `cw_prepare_simulation_asset` and its
+review flow for missing physics; disclose estimates and validate reachability,
+collisions and camera coverage before training. A ready asset is not a trained
+policy or evidence of manipulation success.
+
+The shared Add Asset UI offers **Describe the object**, **Upload a 3D file**, and
+**From a photo**. Description creation uses `/asset-generations/plan` with an
+optional image and `current_design` for revisions. Plans are editable, read-only
+proposals. The existing `/asset-generations` build API accepts a caller workspace,
+optional environment, Private/Public visibility (default private), and a matching
+`design_review`. The generation record retains the reviewed design and estimates;
+only a validated catalog object is published when public visibility was chosen.
+The photo UI requires a photo and permits optional context; appearance does not
+establish moving parts or physics. The current design planner uses the existing
+supported builders; unsupported geometry must remain explicit, never a silent box.

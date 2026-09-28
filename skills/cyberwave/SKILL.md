@@ -16,7 +16,7 @@ Help the user reach a verified Cyberwave outcome. Use Cyberwave MCP tools when t
 
 1. Extract the requested outcome, target resources, desired runtime (`simulation` or `live`), and whether the user asked for execution or only guidance/code.
 2. Read [MCP, CLI, SDK, and dashboard routing](references/mcp-and-fallbacks.md), then inspect the Cyberwave MCP tools actually available in the client. Never assume that every documented `cw_*` tool is callable or that host-local work belongs in MCP.
-3. Establish only the missing context the task requires: account/authentication, workspace, project, environment, then twin. Reuse session context and supplied UUIDs/slugs instead of asking again.
+3. Establish only the missing context the task requires: account/authentication, workspace, project, environment, then twin. Prefer canonical slugs for durable resources and reuse supplied slugs or UUIDs instead of asking again. UUID values remain valid compatibility identifiers; execution-local objects such as runs and checkpoints may only have UUIDs.
 4. Read the narrow workflow reference from the routing table below. Revisit the execution-plane reference when tools are missing, ambiguous, or return structured errors.
 5. Resolve exact targets before mutation. Prefer preview, plan, dry-run, or `execute=false` modes when the available tool supports them.
 6. Execute within the user's request and the safety rules below.
@@ -31,6 +31,7 @@ Help the user reach a verified Cyberwave outcome. Use Cyberwave MCP tools when t
 | Create, clone, edit, trigger, cancel, or inspect a workflow | [Workflow authoring](references/workflow-authoring.md) |
 | Move, navigate, stop, pose, or set joints in simulation or on a physical robot | [Robot control](references/robot-control.md) |
 | Teach, train, retrain, evaluate, bind or review a learned skill, policy or Replay | [Policy training and evidence](references/policy-training.md) |
+| Configure an external SmolVLA policy, joint ordering or unit conversions | [Robot control](references/robot-control.md#external-smolvla-policy-setup) |
 | Install/use the CLI, pair an edge host, manage services/containers, configure media, diagnose host health | [Edge configuration](references/edge-configuration.md) and [verified CLI map](references/cli-command-map.md) |
 | Add a catalog asset, upload URDF, or define capabilities | [Asset and driver development](references/asset-and-driver-development.md) |
 | Create or update a hardware driver, manifest, transport, container, or dev twin | [Driver development](references/driver-development.md) |
@@ -64,7 +65,7 @@ Read at most the references needed for the current request. Do not preload the w
 Finish with evidence appropriate to the task:
 
 - Environment: refreshed context plus rendered or quantitative layout feedback.
-- Workflow: saved workflow UUID, inspected graph/fields, and run state if triggered.
+- Workflow: saved workflow slug (plus UUID when returned), inspected graph/fields, and run state if triggered.
 - Robot control: target, mode, planned action, dispatch result, and observed/returned state.
 - Learned skill: proposal/attempt and checkpoint identifiers, evaluation versus baseline, binding state, and measured deployment/Replay evidence. Training completion is not task success.
 - Edge: installed/configured service state, resolved environment/twins, and driver/container health.
