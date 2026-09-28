@@ -21,7 +21,7 @@ Read this for every Cyberwave task before choosing an execution plane. MCP is th
 | Low-level MQTT/Zenoh integration | SDK/driver code | Only when required; use declared interfaces, not ad hoc topics. |
 | Search exact current behavior | `cw_search_docs`, installed package source, official docs | Tool/source verification precedes examples when interfaces can drift. |
 
-One task can cross planes. For example: MCP creates a development environment and twin; the local scaffold creates a driver; the CLI pairs an edge host; MCP then verifies telemetry. Preserve resource identifiers across those handoffs.
+One task can cross planes. For example: MCP creates a development environment and twin; the local scaffold creates a driver; the CLI pairs an edge host; MCP then verifies telemetry. Preserve canonical resource slugs across those handoffs, and retain UUIDs when a lower-level runtime surface requires them.
 
 ## Capability discovery
 
@@ -30,11 +30,13 @@ Treat the client's callable tool list and tool schemas as authoritative for the 
 - context and resolution: `cw_list_workspaces`, `cw_list_projects`, `cw_list_environments`, `cw_get_environment_context`, `cw_list_environment_entities`, `cw_resolve_twin`
 - catalog and scenes: `cw_list_primitives`, `cw_search_catalog`, `cw_edit_environment`, atomic environment tools, render/layout checks
 - workflows: template search/clone, prompt create/edit, node schemas, run lifecycle
+- RL authoring and deployment: `cw_inspect_rl_tasks` for list/context/source reads, `cw_author_rl_task` for previewed task/source/scene operations, and `cw_deploy_rl_policy` for signed checkpoint upload, registration, controller publication, guarded twin assignment, and previewed controller start/stop
+- remote labs: `cw_manage_remote_lab` for pool/session status plus previewed access request and session release; a confirmed live RL start additionally requires the active session for that twin's environment
 - control: `cw_list_control_surfaces`, `cw_plan_control_action`, `cw_resolve_control_route`, `cw_dispatch_control_action`
 - observation: twin/schema/joints, captures, frames, environment previews
 - documentation: `cw_search_docs`
 
-Inspect parameters before calling. If a named tool is absent, choose an available equivalent or fallback; do not pretend the call happened.
+Inspect parameters before calling. Current MCP schemas advertise durable entity references as `*_slug` (for example `environment_slug`, `twin_slug`, and `workflow_slug`). Pass the canonical full slug returned by a list/read/create tool. UUID values and the legacy `*_uuid` argument spellings remain accepted for compatibility, but do not make an agent translate a known slug back to a UUID. Execution-local references without canonical slugs, including run, request, checkpoint, attachment, workload, and generation IDs, remain UUID-named. If a named tool is absent, choose an available equivalent or fallback; do not pretend the call happened.
 
 Deprecated interfaces must not be newly recommended:
 
@@ -51,7 +53,7 @@ Read both human content and structured result fields. At minimum inspect:
 - `retry_safe`
 - `details`
 - action metadata such as mutation/destructive/preview support
-- returned resource UUIDs and mode
+- returned canonical resource slugs, UUIDs when present, and mode
 
 Retry only when `retry_safe` is true and something relevant changed. Never turn an ambiguous-target response into a guessed target. Preserve request IDs when reporting a platform failure.
 
@@ -73,7 +75,13 @@ For exact SDK methods, CLI commands, API schemas, MQTT topics, or workflow node 
 2. In a Cyberwave checkout, inspect current source and `docs-mintlify`.
 3. Otherwise use [docs.cyberwave.com](https://docs.cyberwave.com).
 
-Do not use an old example as proof of a current interface. In particular, prefer unified slugs over deprecated `registry_id`/`catalog_seed_id` where the current API supports slugs; MCP catalog instantiation may still explicitly require a returned `registry_id`.
+Do not use an old example as proof of a current interface. Prefer unified slugs for durable resource references. UUIDs remain supported, but are the compatibility/lower-level form rather than the identifier an agent should seek first. `registry_id`/`catalog_seed_id` are deprecated as general identities; MCP catalog instantiation may still explicitly require a returned `registry_id` as the catalog selection key.
+
+For a verified REST catalog integration, `GET /api/v1/assets` accepts optional
+`ordering`: `created_at`, `-created_at`, `name`, `-name`, `monthly_price`, or
+`-monthly_price`. Ordering applies before offset/limit pagination. Omit it to
+preserve relevance-first search, oldest-first public browsing, and newest-first
+owned browsing. This is a REST parameter, not a `cw_search_catalog` argument.
 
 ## SDK baseline
 
