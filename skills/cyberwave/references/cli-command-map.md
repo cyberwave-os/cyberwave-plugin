@@ -32,6 +32,8 @@ Prefer MCP for environment/workflow/cloud mutations when the equivalent typed to
 | --- | --- |
 | First-time setup/pairing | `cyberwave pair` or `cyberwave edge install` |
 | Remove local edge service/config | `cyberwave edge uninstall` |
+| Update or roll back the CLI itself (and the SDK it bundles) | `cyberwave update --check`, then `cyberwave update [--version X]` (`sudo` for the Debian package) |
+| Update or roll back edge-core (Debian/Ubuntu) | `cyberwave edge update --check`, then `sudo cyberwave edge update [--version X]` |
 | Service lifecycle | `cyberwave edge start`, `stop`, `restart`, `status` |
 | Refresh local config | `cyberwave edge pull` |
 | Recent/followed service logs | `cyberwave edge logs` |

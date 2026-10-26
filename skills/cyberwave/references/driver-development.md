@@ -149,6 +149,15 @@ Commands accepting alternative payloads can declare `CommandArgs(required_any_of
 - For an edge-local data channel, set `enable_zenoh=True` and a stable `zenoh_channel` on its `TopicSpec`.
 - Dual transport is inferred from `enable_mqtt=True` plus `enable_zenoh=True`.
 - Use `CYBERWAVE_PUBLISH_MODE=mqtt_only` only as an operator override to disable Zenoh publishing.
+- Answer MQTT v5 command requests. A `twin/command` message that carries a Response
+  Topic (`{prefix}cyberwave/twin/{twin_uuid}/command/{client_id}/response`) and
+  Correlation Data gets exactly one `twin.command_response.v1` reply on that topic,
+  echoing the Correlation Data: `accepted`, `rejected` (refused before reaching the
+  device), `denied` (the device refused, with its reason) or `timeout`. Messages
+  without a Response Topic get no reply. Resolve the topic prefix like the SDK
+  (`CYBERWAVE_MQTT_TOPIC_PREFIX`, else `CYBERWAVE_ENVIRONMENT` unless production):
+  edge-core injects only `CYBERWAVE_ENVIRONMENT`. See the cyberwave-contracts README and the
+  PX4 gateway (`runtime-services/drivers/native/px4/px4_driver/gateway_service.py`).
 
 Follow the public SDK's [fake IMU driver example](https://github.com/cyberwave-os/cyberwave-python/blob/main/examples/fake_imu_driver.py). Declare MQTT and Zenoh transport settings together with the unified `TopicSpec` fields.
 
