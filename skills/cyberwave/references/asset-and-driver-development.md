@@ -128,8 +128,12 @@ Creating/deploying a kit does not dispatch hardware commands or purchase it.
 
 ## Imported robot simulation runtimes
 
-A catalog may declare `metadata.simulation_runtime = {"kind": "go2_ros2"}`
-(or `spot_ros2`, `mir250_ros2`). The existing `seed_asset_driver_config`
+A catalog may declare `metadata.simulation_runtime = {"kind": "mobile_ros2"}`
+for a robot whose driver graph runs Nav2, or `{"kind": "arm_ros2"}` for a
+manipulator whose graph executes trajectories. The kind names a role, so a new
+robot needs no platform change. Older drivers declare per-robot names
+(`go2_ros2`, `spot_ros2`, `mir250_ros2`, `m20_ros2`, `kinova_ros2`), which
+behave like their role. The existing `seed_asset_driver_config`
 command copies the manifest's `simulation_runtime` into catalog metadata.
 New twins inherit this with their other asset defaults; a twin's explicit
 choice wins. `{"kind": "none"}` disables automatic ROS2 startup. Missing
@@ -141,3 +145,25 @@ This is operator/catalog configuration, not a live driver's topic advertisement.
 It does not prove navigation readiness or choose an image: declared topology
 still uses the existing `drivers` profiles. Review imported catalog defaults
 and twin overrides before starting simulation; do not overwrite running setups.
+
+### Independent simulation stacks
+
+New simulator drivers may declare a top-level `simulation_stack`; do not encode
+them as a new `simulation_runtime.kind`. Version 1 requires
+`executor: driver_declared`, `startup_phase: before_physics`, explicit external
+`navigation` and `actuators` authority, and `cyberwave-step-v1` with an explicit
+`control_interface.channel_count` (the vehicle's rotor count). A stack runs
+only for twins that opt in by carrying `simulation_stack` in their own metadata;
+the asset's copy is a template. The backend copies the twin's declaration and
+the resolved driver block (twin first, then asset) into the workload. Missing or
+unhealthy topology is fatal and never falls back to the legacy fat ROS image.
+A stack twin can share an environment with a ROS2-runtime twin, but one twin
+can never be claimed by both.
+
+The PX4 package is the canonical example. Its `robot` topology contains only
+the portable MAVLink gateway and accepts a configured serial/TCP/UDP endpoint.
+Its `sim` topology adds pinned PX4 SITL and the MuJoCo adapter. Never place a
+host socket path in catalog metadata: the simulation orchestrator owns the
+private mount. Validate both rendered variants, verify that `robot` contains no
+SITL/adapter/control mount, and use plant-derived pose/contact evidence for E2E
+claims rather than command intent.

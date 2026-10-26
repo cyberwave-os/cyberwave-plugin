@@ -40,6 +40,7 @@ remaining setup instead of creating a replacement.
 ### Edit an existing workflow
 
 - Use `cw_update_workflow_fields` for name, description, activation, visibility, or metadata.
+- Declare the run params a workflow accepts with `cw_update_workflow_fields(params_schema=[{name, type, default, required, description, options}])` (omit to leave as-is, `[]` clears). Nodes read them as `{{params.x}}`; declared defaults also apply to scheduled and MQTT-triggered runs. Do not put them in `metadata`: the declaration is owned by `params_schema`.
 - Use `cw_edit_workflow_from_prompt` for graph structure or node parameter changes.
 - Resolve a real UUID first.
 - Preview continuity-sensitive, structural, active, or large edits and obtain explicit approval before `execute=true`.
@@ -51,7 +52,7 @@ remaining setup instead of creating a replacement.
    the Environment's `control_plane_access`: `direct_control` forbids workflow
    execution through MCP/A2A, while `workflows` and
    `direct_control_and_workflows` allow it.
-2. Preview with `cw_trigger_workflow(execute=false)`.
+2. Preview with `cw_trigger_workflow(execute=false)`. Pass per-run values as `params` (validated against the workflow's `params_schema`); `inputs` stays the free-form payload.
 3. Trigger only when execution was requested.
 4. Capture the returned run UUID.
 5. Monitor with `cw_get_workflow_run` or bounded `cw_list_workflow_runs` checks until a terminal state or the user's requested observation window ends.
