@@ -60,7 +60,7 @@ Retry only when `retry_safe` is true and something relevant changed. Never turn 
 ## Selection order
 
 1. Cyberwave MCP for typed contextual platform operations.
-2. Python SDK for application code or operations not exposed through MCP.
+2. Python SDK for application code or operations not exposed through MCP; the official JavaScript SDK for custom browser/React interfaces after checking its release and backend availability.
 3. Cyberwave CLI for authentication plus host-local installation, pairing/bootstrap, service/container/media operations, diagnostics, and explicit CLI workflows.
 4. Dashboard for registration, identity, permissions, billing, visual/manual steps, or unsupported mutations.
 5. Verified REST/MQTT/Zenoh only for a lower-level integration requirement.
@@ -93,6 +93,8 @@ export CYBERWAVE_API_KEY="<secret>"
 ```
 
 Inspect the installed SDK or official docs before emitting methods. Use the SDK's simulation/live routing rather than manually changing source markers. Keep application setup code separate from edge driver code.
+
+For custom web interfaces, inspect [the JavaScript SDK guide](https://docs.cyberwave.com/overview/tools/javascript-sdk) and [cyberwave-node](https://github.com/cyberwave-os/cyberwave-node). The development SDK composes a generated REST client with optional `@cyberwave/react` and `@cyberwave/environment-3d` packages. Check installed package versions and backend preview endpoint availability before recommending a component. Reuse named environment/dataset/model browsers, workflow planning/monitoring, sensor video/telemetry and evidence review components; keep credentials owned by the host application and visualization separate from command dispatch. API-contract regeneration, component tests and tag releases are documented in the SDK's `docs/releases.md`.
 
 ## CLI baseline
 
