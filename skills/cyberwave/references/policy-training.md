@@ -149,7 +149,7 @@ from a session to retrieve its latest 200 log lines; logs require environment
 write access. Task/checkpoint/workload filters restrict retained reports, whose
 original evidence-source labels and hardware-approval flags are preserved.
 Capture available simulated camera frames separately with `cw_capture_frame`
-or `cw_capture_frames`, using `mock=false`.
+(pass `count` for a burst), using `mock=false`.
 
 For an episode reset, stop the current run with `cw_stop_simulation`, then use
 `cw_start_simulation`. Each start creates a fresh simulation workload/worker and

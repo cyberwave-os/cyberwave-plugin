@@ -23,6 +23,8 @@ Do not fork a driver merely for a different display name or environment placemen
 
 Keep hardware capability separate from the operator’s preferred input. In the catalog **Capabilities → Control preferences** editor, supported manual input and policy can be optional or required, with an independent preferred entry. Workbench and catalog share the form; the save target remains the asset, while twin assignments retain their existing scope. A preference never grants motion permission or proves adapter compatibility. Preserve existing control declarations during unrelated capability edits; do not downgrade unknown versions or retry a stale save without rereading the current configuration. Use the existing input/policy editors and verify the actual robot connection before execution.
 
+A driver whose leader device is wired to the robot side, or that can release torque for hand guiding, declares it at the top level of `cw-driver.yml`: `driver_capabilities: [local_teleop, hand_guide]` (the only accepted values). Catalog seeding (`seed_asset_driver_config`) copies it onto the asset, and the robot is then offered the Local Teleop controller and its Hand-guide switch. Twin-level `set_schema` does not apply it. Nothing in the driver reads the field: declare it only when the driver already runs those operations.
+
 ## Asset onboarding
 
 In the dashboard, use **Add asset** to choose an existing file (URDF/Xacro ZIP,
@@ -47,9 +49,36 @@ For URDF through MCP:
 
 1. Validate the ZIP locally: main URDF path, referenced meshes/textures, case-sensitive paths, units, joints/limits, and no unsafe paths.
 2. Preview/resolve workspace and visibility.
-3. Call `cw_create_urdf_asset_from_zip` with the exact package and main file when needed.
-4. Immediately call `cw_set_asset_capabilities(execute=false)` with capabilities grounded in the asset/driver, inspect the preview, then execute.
-5. Fetch/search the asset, instantiate a test twin with `cw_add_twin_to_environment`, and render/inspect it in a safe environment.
+3. Upload the package with the exact main file when needed. Under 2 MiB, call
+   `cw_create_urdf_asset_from_zip`, which carries the ZIP inside the request.
+   Above it -- most vendor URDFs, once meshes are included -- call
+   `cw_begin_urdf_asset_upload`, `PUT` the bytes to the signed `upload.upload_url`
+   with the `upload.headers` it returns, then `cw_complete_urdf_asset_upload`.
+4. Immediately call `cw_set_schema(asset_uuid_or_registry_id=..., path="/extensions/cyberwave/capabilities", value=..., execute=false)` with capabilities grounded in the asset/driver, inspect the preview, then execute.
+5. Fetch/search the asset, instantiate a test twin with a `cw_edit_environment` `{op: "create", kind: "twin"}` operation, and render/inspect it in a safe environment.
+
+To replace the package on an asset that already exists -- a corrected livery, a
+fixed mesh -- call `cw_begin_urdf_package_replacement` with the asset instead of
+`cw_begin_urdf_asset_upload`, then the same `PUT` and
+`cw_complete_urdf_asset_upload`. It reuses the asset's URDF project, so the
+registry id, capabilities and twins survive; creating a second asset would
+strand all three.
+
+Aim sensors with `cw_aim_sensor(sensor, facing)`, not by writing a quaternion.
+Imaging sensors are aimed in their optical frame (view down local -Z) and
+ranged sensors in REP-103 (beam down local +X), so the `rpy="0 0 0"` most vendor
+URDFs ship leaves the lidar correct and every camera pointing at the floor. The
+tool reads the sensor's declared type and picks the convention; a sensor with no
+aimable frame (`imu`, `gps`, `audio`) is refused rather than aimed. Update
+actuators by name with `cw_update_asset_actuator`, which merges your fields onto
+the entry under the schema hash it read, instead of hand-addressing
+`/actuators/N` through the universal-schema path.
+
+Recolour an asset with `cw_set_asset_livery`, not by replacing its package. Preview
+first: the result lists the links each rule colours, the rules that colour nothing
+and the links no rule covers. Fix those before `execute=true`. The catalog
+thumbnail is re-rendered after the write. A livery can't be removed: correct a
+wrong one by writing the corrected livery.
 
 Capabilities live under `/extensions/cyberwave/capabilities`. Do not infer capabilities from appearance alone. Verify field names and semantics from the current Digital Twins documentation or schema before writing them.
 
@@ -75,10 +104,11 @@ rotation follows the right-hand rule. Geometry origins are link-relative. Do not
 add a Three.js Y-up conversion or infer axes from the viewing angle.
 
 Read `cw_get_schema` and `cw_get_joint_states` before proposing joint motion.
-Use exact names, types, limits and current state. `cw_set_joint` defaults to
-degrees: pass `degrees=false` for radians or prismatic metres. `cw_motion_pose`
-always takes radians/metres. Both accept absolute targets, not normalized policy
-values. Keep control previews distinct from observed movement.
+Use exact names, types, limits and current state. For an exact joint target,
+call `cw_plan_control_action` with `route_id="joint-targets"` and
+`inputs={"joint_targets": {...}}` in radians (revolute) or metres (prismatic).
+Targets are absolute, not normalized policy values. Keep control previews
+distinct from observed movement.
 
 For `cw_request_asset_generation`, select a builder that implements the required
 parts and motion; prose cannot change its joints. `hinged_box` is hollow with a
@@ -128,8 +158,12 @@ Creating/deploying a kit does not dispatch hardware commands or purchase it.
 
 ## Imported robot simulation runtimes
 
-A catalog may declare `metadata.simulation_runtime = {"kind": "go2_ros2"}`
-(or `spot_ros2`, `mir250_ros2`). The existing `seed_asset_driver_config`
+A catalog may declare `metadata.simulation_runtime = {"kind": "mobile_ros2"}`
+for a robot whose driver graph runs Nav2, or `{"kind": "arm_ros2"}` for a
+manipulator whose graph executes trajectories. The kind names a role, so a new
+robot needs no platform change. Older drivers declare per-robot names
+(`go2_ros2`, `spot_ros2`, `mir250_ros2`, `m20_ros2`, `kinova_ros2`), which
+behave like their role. The existing `seed_asset_driver_config`
 command copies the manifest's `simulation_runtime` into catalog metadata.
 New twins inherit this with their other asset defaults; a twin's explicit
 choice wins. `{"kind": "none"}` disables automatic ROS2 startup. Missing
@@ -141,3 +175,25 @@ This is operator/catalog configuration, not a live driver's topic advertisement.
 It does not prove navigation readiness or choose an image: declared topology
 still uses the existing `drivers` profiles. Review imported catalog defaults
 and twin overrides before starting simulation; do not overwrite running setups.
+
+### Independent simulation stacks
+
+New simulator drivers may declare a top-level `simulation_stack`; do not encode
+them as a new `simulation_runtime.kind`. Version 1 requires
+`executor: driver_declared`, `startup_phase: before_physics`, explicit external
+`navigation` and `actuators` authority, and `cyberwave-step-v1` with an explicit
+`control_interface.channel_count` (the vehicle's rotor count). A stack runs
+only for twins that opt in by carrying `simulation_stack` in their own metadata;
+the asset's copy is a template. The backend copies the twin's declaration and
+the resolved driver block (twin first, then asset) into the workload. Missing or
+unhealthy topology is fatal and never falls back to the legacy fat ROS image.
+A stack twin can share an environment with a ROS2-runtime twin, but one twin
+can never be claimed by both.
+
+The PX4 package is the canonical example. Its `robot` topology contains only
+the portable MAVLink gateway and accepts a configured serial/TCP/UDP endpoint.
+Its `sim` topology adds pinned PX4 SITL and the MuJoCo adapter. Never place a
+host socket path in catalog metadata: the simulation orchestrator owns the
+private mount. Validate both rendered variants, verify that `robot` contains no
+SITL/adapter/control mount, and use plant-derived pose/contact evidence for E2E
+claims rather than command intent.
