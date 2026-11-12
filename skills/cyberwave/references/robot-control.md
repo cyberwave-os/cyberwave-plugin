@@ -54,7 +54,7 @@ If mode is omitted, use `simulation`. Do not infer live mode from words like "ro
 
 ## Resolve target and affordances
 
-1. Use `cw_resolve_twin` or `cw_list_twins` until exactly one twin is selected.
+1. Use `cw_list_environment_entities` (`entity_type: "twin"`, `name`) until exactly one twin is selected.
 2. Use `cw_list_control_surfaces` with the same `mode` as planning to inspect available movement, pose, joint, observation, controller-policy, and stop affordances. The SDK equivalent is `agents.control.list_surfaces(environment_uuid, mode="simulation")`. Explicit Live driver restrictions do not describe simulation actuators; an omitted mode is evaluated as live, the strictest view.
 3. Inspect the surface’s per-mode `runtimes` readiness (`available`, `runtime`, and `reason`). Backend admission includes twin health and registered edge availability; do not reconstruct it from client metadata flags. Local connection loss can further disable Live controls. Inspect twin/schema/joint state or edge/driver health when it affects safe execution.
 4. If the target or affordance is ambiguous, ask the user to choose; do not guess.
@@ -312,27 +312,25 @@ reload and review before retrying; do not substitute a newer revision onto the
 old offset. A target change starts a new edit. Catalog and Workbench use this same
 flow, and Monitor can inspect the frame without saving or placing its point.
 
-Prefer reusing an existing input controller reference and a reviewed action-local mapping over creating another controller/slug. The action API supports saved joint mappings and, on v3-capable deployments, command mappings; these are not general activated template inheritance. Review migration preserves original presets and existing drafts; never report a saved draft as active migration. Calibration/device pairing remains instance-specific. Catalog Control and Workbench share the setup form; Capabilities declares support rather than hosting Control preferences.
+Prefer reusing an existing controller and customizing it through controller settings (see **Keyboard customization**) over creating another controller/slug or cloning one. Per-action key and gamepad mappings no longer exist: action drafts hold only the policy, operator visibility and workflow templates, and the server rejects `input_mappings`/`input_policy_uuids` in new drafts. Calibration/device pairing remains instance-specific. Catalog Control and Workbench share the setup form; Capabilities declares support rather than hosting Control preferences.
 
-When changing only a key or gamepad trigger, preserve the saved command arguments, including absent values and legacy aliases. Do not merge newly advertised defaults into an existing payload: they may change which operation the driver performs. Defaults initialize new bindings; parameter changes require their own review. A listed command without an argument contract is not evidence that it accepts an empty payload.
+When changing only a key, preserve the saved command arguments, including absent values and legacy aliases. Do not merge newly advertised defaults into an existing payload: they may change which operation the driver performs. Defaults initialize new bindings; parameter changes require their own review. A listed command without an argument contract is not evidence that it accepts an empty payload.
 
-Several distinct keys or gamepad triggers may invoke the same declared command
-with different parameters (for example Grip/Release or two light intensities).
-Keep them as separate rows in the existing input mapping. Identify the row by
-its trigger when editing; deduplicating by command/actuation loses configuration.
-The UI's Add key / Add input follows this same format without creating a preset.
+Several distinct keys may invoke the same declared command with different
+parameters (for example Grip/Release or two light intensities). Keep them as
+separate rows in the keyboard bindings. Identify the row by its key when editing;
+deduplicating by command/actuation loses configuration. The UI's Add key follows
+this same format without creating a preset.
 
 A command spec may declare `required_any_of`: supply at least one of those typed argument names, preserving its declared type and bounds. Zero is a value, not a missing setting. For UGV lighting, `pwm` sets both lights; existing channel or array parameters remain valid alternatives. Do not add `pwm` to a saved channel-specific payload. Setup validation and saving do not execute the driver.
 
-Preset joint keys are reviewed against the target's joints before the editor offers reuse. An absent action mapping reuses those reviewed keys; an explicit empty mapping clears them; Reset removes only the override. Extra legacy settings, other command modes or foreign joints require review, not a lossy conversion. A preset update invalidates the save review. This authoring projection is not a frozen runtime snapshot or permission to execute.
-
-For reusable command keyboards, the action response may include `input_layout` on an input option. This is an explicit suggestion, not an inherited or active mapping. Use it only after checking the intended keys; save it through the existing v3 action configuration with `expected_revision`. Driver declarations supply the commands, typed defaults and repeat behavior. Unsupported, ambiguous or incomplete commands remain unmapped; do not infer values or create another robot-specific controller. Preserve existing custom maps and deliberately cleared maps. A changed template requires a new review. Catalog saves affect asset defaults; twin saves remain local. This does not start an input or policy.
+Preset joint keys are reviewed against the target's joints before the editor offers reuse. An absent override reuses those reviewed keys; an explicit empty map clears them; Reset removes only the override. Extra legacy settings, other command modes or foreign joints require review, not a lossy conversion. A preset update invalidates the save review. This authoring projection is not a frozen runtime snapshot or permission to execute.
 
 ## Plan
 
 Use `cw_plan_control_action` as the primary entry for move, navigate, stop, observe, pose/motion, or joint intents. State the action precisely and pass explicit environment/twin/mode.
 
-Use `cw_resolve_control_route` only as a lower-level pre-validation step when a specific route needs structured inputs. If it reports `needs_setup`, fill missing fields only from accepted target shapes and listed candidates, then plan again.
+For an exact target (a joint value, a waypoint, a pose, a stop), pass the discovered `route_id` with structured `inputs` to `cw_plan_control_action` instead of a message. If it reports `needs_setup`, fill missing fields only from accepted target shapes and listed candidates, then plan again.
 
 Inspect the plan for:
 
@@ -370,7 +368,7 @@ and the live execution gate below still apply.
 
 When the user requested execution, pass exactly one returned action to `cw_dispatch_control_action` with `mode="simulation"`. Verify its result and observed state before another action.
 
-Atomic tools such as `cw_set_joint`, `cw_motion_pose`, `cw_navigation_goto`, and `cw_navigation_stop` remain useful for supported direct/diagnostic flows. Inspect their schemas and preview/execute behavior. Prefer the plan/dispatch path for general agent control.
+For an exact target (a joint value, a waypoint, a stop), pass the discovered `route_id` with its `inputs` to `cw_plan_control_action` instead of describing it in `message`, then dispatch the returned action as above.
 
 For a bounded learned-policy run, preserve the requested positive integer
 `max_steps` and inference `device` (`cpu` or `gpu`) in the controller-policy
@@ -465,22 +463,91 @@ If dispatch times out or returns an uncertain result:
 - use a stop if it is safe and supported,
 - report the uncertainty and request operator direction.
 
+## Controllers
+
+A twin has exactly one controller. Each controller belongs to one category, and
+only these labels are used: **Manual teleop** (browser keyboard, USB leader arm
+over WebSerial), **Local teleop** (leader arm or remote wired to the robot's
+edge), **Agentic** (an LLM plans from a goal) and **Policy** (a trained model
+such as a VLA or RL policy). The controller schema carries a computed `category`
+and `deprecated` flag; `GET /api/v1/controller-policies?category=` filters by
+it. Use the API category rather than inferring it from a name or
+`controller_type`. Controller hierarchies and fallback controllers do not exist;
+do not plan or promise one.
+
+In the UI the controller is chosen with **Choose controller** in the twin's
+**Controller** section of the right-hand panel, in every mode. Through the API
+the twin's `controller_policy_uuid` is the assignment. Changing it replaces the
+current controller; stop a running one first and confirm the switch with the
+user.
+
+Customize instead of cloning. The settings of every controller (keys, the
+Agentic config, the Policy model) resolve twin ▸ environment ▸ asset ▸
+controller defaults through the controller-settings endpoints described under
+**Keyboard customization**; the UI calls the scopes **This twin** and **All
+twins in this environment**, with **Reset to defaults**. Copying a controller is
+only the catalog's explicit **Duplicate**.
+
+**Agentic.** One seeded controller (`controller:agentic:v1`). Customizable keys:
+`model` (an LLM model UUID; empty means the default), `tools.action_kinds`
+(empty allows every action the robot supports), `tools.motion_model_uuid`, and
+`instructions`, which are appended to the planner's fixed safety prompt and
+never replace it. `observations.perception_model_uuids` lists perception models
+skills may use. A step limit, an approval mode, and camera or skill lists are
+not accepted yet (400), because no runtime enforces them. The planner
+applies this config only when the target twin's assigned controller is the
+Agentic controller. An Agentic `model` set for the twin or the environment wins
+over the `llm_model_uuid` in the request; the request model applies only when
+neither sets one. A model on the robot (asset) is only a recommendation, as it
+is for skills. The environment assistant's chat model
+(`PUT /api/v1/agents/environments/{uuid}/model`) is a separate setting and is
+used for planning only when the robot has no Agentic model; set the Agentic
+model to change how a robot plans. The UI entry is **Ask the agent** (header
+**AI** menu and the twin context menu), and its panel is titled **Agentic
+controller**; it plans and dispatches through the same control-agent tools.
+
+**Policy.** One seeded controller (`controller:policy:v1`); the older per-model
+`vla`/`mlmodel` rows are presets of it (`metadata.preset_of`) and keep working.
+Customizable keys on any model-driven controller: `model_uuid`,
+`default_instruction` (only for models that accept a language instruction),
+`control_rate_hz` and `max_steps`. `GET /api/v1/twins/{uuid}/policy-models`
+lists the models ranked by contract compatibility, for manipulation tasks only;
+velocity-command (locomotion) models stay on their presets. Setup fixes such as
+the joint mapping and the IK tool frame are offered next to that model picker.
+Deploying a fine-tune assigns the Policy controller and records the trained
+model as the twin's choice; it creates no controller per model. The
+Intelligence panel and `/intelligence` endpoints are removed: model choices live
+in the Agentic and Policy settings. Do not look for or recreate them.
+
+**Local teleop and Hand-guide.** The Local Teleop controller and its Hand-guide
+mode (the `freedrive` controller, hidden from the picker) are offered where the
+asset's driver declares `driver_capabilities: [local_teleop, hand_guide]` in
+`cw-driver.yml` (copied onto `Asset.metadata` by catalog seeding), or where the
+robot is already linked to the controller (OpenArm). The Local teleop card shows
+edge connection and leader/follower state from existing driver alerts
+(`follower_only_mode`, `calibration_needed`, `edge_error_*`); there is no live
+mirroring telemetry, so "ready" is not evidence of motion. Hand-guide switches
+the twin between those two controllers: torque is released and the twin follows
+the arm moved by hand. Local teleop needs the real robot and does not run in
+Simulate. Gamepad input and per-action key/gamepad mappings have been removed;
+there is no gamepad controller.
+
 ## Control setup and catalog defaults
 
 Use `cw_get_control_setup` with an explicit `target_kind` (`asset` or `twin`)
-and UUID. Its overview returns the same capability choices, saved mappings and
-setup findings as the UI. Read again with the chosen `action_key` to get its
-configuration, selectable inputs/policies and review revision. Use
+and UUID. Without `action_key` it reads the services overview
+(`GET /api/v1/{assets|twins}/{uuid}/control-profile/services`): the same
+capabilities, saved services, actions and setup findings as the UI. Read again
+with the chosen `action_key` to get its configuration, selectable policies,
+operator visibility, workflow templates and review revision. Use
 `cw_save_control_setup` to save the edited configuration with that
 `expected_revision`; preserve its version and unrelated fields. A stale save
 requires a fresh read and review. Do not substitute raw metadata writes.
 
-Standard `input_layout` suggestions can be reused across actions. They become
-local mappings only when deliberately selected and saved; an explicitly empty
-mapping stays empty. A saved velocity-input policy may supply the standard
-keyboard/gamepad layout even without a hardware command catalog. Its returned
-`input_setup.source` identifies the policy and simulation scope. This does not
-enable hardware access or fix an incompatible output/actuator adapter.
+Action drafts carry no key or gamepad mappings; customize keys through
+controller settings instead (see **Keyboard customization**). Neither a saved
+action nor a keyboard customization enables hardware access or fixes an
+incompatible output/actuator adapter.
 
 When a finding has `resolution=runtime_adapter_required`, explain its short
 summary and offer another compatible policy or implementation of the required
@@ -489,7 +556,7 @@ runtime adapter. This is not an automatic parameter repair: retain the technical
 These tools save configuration only; starting an input, runtime or motion still
 uses its existing execution path and permissions.
 
-On deployments with the Workbench Control setup assistant, start from the selected
+On deployments with the Workbench Controllers setup assistant, start from the selected
 twin's available actions. Input presets explain how an operator invokes an action;
 the executable controller/policy and its robot connection are separate concerns.
 An unavailable controller in a filtered catalog is not permission to replace the
@@ -505,7 +572,7 @@ control-profile route API with `expected_revision`. A 409 requires refreshed
 evidence and a new review. Twin edit rights do not grant asset edit rights.
 
 In **action setup**, the same form in Catalog
-and Workbench can retain several saved input presets and a policy for one action.
+and Workbench saves a policy, operator visibility and workflow template for one action.
 These drafts do not replace current controls, start a robot or activate a policy.
 Workbench offers an optional **Test** link for external scripted/RL policies that
 support a step limit. Opening it automatically checks the saved policy revision;
@@ -524,29 +591,12 @@ are reviewable; a stale save needs a fresh review, never an automatic retry.
 Unknown versions require a compatible editor. There is no draft-activation MCP
 tool; check deployment support and keep existing runtime configuration explicit.
 
-If the action exposes `input_setup.kind=keyboard_joint`, **Map keys** reuses the
-existing driver keyboard form inside the action. It binds selected keyboard
-presets to declared independent joint positions. Apply changes the local form;
-Save persists a version 2 action draft. It does not edit the shared preset or
-activate controls. Policy changes retain the mappings. Do not use this shape for
-locomotion command ports, gamepad axes, leader pairing or Cartesian output.
-A v2 head rejects older v1 writes even with a fresh review token. Historical
-restoration must explicitly acknowledge removing maps and preserve the v2
-write-version floor; never silently retry as v1 or rewrite the original snapshot.
-Robot-owned coupling is derived and checked centrally, not supplied by the LLM.
-
-If `input_setup.kind=keyboard_commands`, use its scoped `mqtt_schema` and the same
-keyboard form for the action's declared commands and parameters. Save as v3 with
-`input_mappings[controller_uuid] = {kind: "keyboard_commands", bindings: [...]}`.
-One input template UUID can be reused across Drive, Camera direction and Lighting;
-local mappings belong to each action, not new controller records. Templates are
-discovered through catalog ACL and may show a purpose-specific `input_label`.
-Use the returned template compatibility review before selecting a reference. A fresh revision token does not bypass an unsupported template version or intent profile. Keep existing maps inspectable; remove an incompatible reference deliberately instead of creating a replacement clone. Gamepad/leader template eligibility alone does not prove runtime support.
-Unknown/opaque legacy command fields need explicit review, not lossy conversion.
-V3 saves check command contracts and key conflicts across explicit saved action
-sections. They do not activate inputs or resolve legacy fallback keys, workflow
-shortcuts, device ownership or release behavior. Old editors cannot downgrade v3
-configuration. Preserve the returned write-version floor when restoring history.
+Action drafts no longer carry `input_mappings` or `input_policy_uuids`
+(keyboard-joint, keyboard-command and gamepad maps per action were removed). Older
+saved revisions that still contain them stay readable; those keys are ignored.
+Do not write them. Change keys through the keyboard preset's controller settings
+or `PUT /api/v1/twins/{uuid}/keyboard-bindings`, never by creating a controller
+per robot or per action.
 
 When the deployment exposes a policy `connection` on action-draft options, use
 that shared backend review rather than rebuilding compatibility rules in the
@@ -647,7 +697,7 @@ New preview workloads retain a versioned output interpretation. An `output_seman
 
 ### Operator presentation
 
-`operator_ui.visible` is a presentation setting on an asset/twin action binding, not permission or runtime availability. A presentation-only update uses the existing `PUT /api/v1/{assets|twins}/{uuid}/control-profile/actions/{action_key}` with `expected_revision` and `operator_ui: {visible: false|true}`. Provide this or `configuration`, never both. It retains policy/model review fingerprints and input mappings. Older full configuration writes that omit the field preserve it. New twins copy the asset setting once; later catalog edits do not change the twin snapshot.
+`operator_ui.visible` is a presentation setting on an asset/twin action binding, not permission or runtime availability. A presentation-only update uses the existing `PUT /api/v1/{assets|twins}/{uuid}/control-profile/actions/{action_key}` with `expected_revision` and `operator_ui: {visible: false|true}`. Provide this or `configuration`, never both. It retains policy/model review fingerprints. Older full configuration writes that omit the field preserve it. New twins copy the asset setting once; later catalog edits do not change the twin snapshot.
 
 Hidden typed route panels remain discoverable in Control setup; saved pins retain their references. Agent/SDK/workflow route resolution and ACL checks are unchanged. Do not infer that a hidden panel makes an action unavailable, disables keyboard presets, revokes control access, or stops an execution.
 
@@ -657,53 +707,40 @@ Hidden typed route panels remain discoverable in Control setup; saved pins retai
 `PUT /api/v1/twins/{uuid}/keyboard-bindings` edits the assigned keyboard's keys without creating a preset or changing the assignment. Supply `policy_uuid`, its reviewed `expected_policy_updated_at` (pass the API string unchanged, including microseconds), the reviewed `expected_bindings`, and replacement `keyboard_bindings`. Requires twin write and preset read access. A 409 means the assignment, preset or effective keys changed; reload and review rather than replaying an old edit. For joint maps, `[]` explicitly clears the map; unknown joints, duplicate keys, injected command fields and incorrect mimic couplings are rejected. A preset with `command_key_revision` also supports twin-local command re-keying: retain the complete ordered binding list and every field except `key`, including command values and release behavior. Missing, added or changed commands fail. Driver-declared command surfaces are supported without a legacy control mode. Mixed inputs retain their existing editor. Preserve control mode and driver capabilities. Saving keys does not dispatch motion or activate saved action drafts. Use the environment-owned twin's settings; do not rewrite a shared preset to customize one robot.
 
 
-### Composed keyboard inputs
+### Services overview
 
-The control input review with `include_services=true` also lists the configured
-services for each action, including built-in navigation, IK and mapping. Use the
-returned provider and setup issues rather than inferring them from robot names.
-A provider's `selected` field describes its configuration, not runtime readiness.
-An unavailable custom policy/workflow remains a repairable selection; do not
+`GET /api/v1/{assets|twins}/{uuid}/control-profile/services` (read access) lists
+`capabilities`, the configured `services` for each action (including built-in
+navigation, IK and mapping) and the saved `actions`. Use the returned provider
+and setup issues rather than inferring them from robot names. A provider's
+`selected` field describes its configuration, not runtime readiness. An
+unavailable custom policy/workflow remains a repairable selection; do not
 silently replace it with a default service. Reading this overview creates no
-service instance and grants no control access.
+service instance, writes no revision and grants no control access. Keys left on
+older saved revisions by the removed per-action input mappings are ignored.
 
-Overview keeps older mappings under **Previous input setup** when saved inputs
-overlap. **Assigned input setup** stays expanded while the twin still uses its
-previous assignment. Neither label means the device or robot is connected.
-**Keyboard selected** describes an explicit browser selection; Monitor remains
-read-only. Expanding a previous map does not migrate or activate it.
+Per-action drafts at `/api/v1/{assets|twins}/{uuid}/control-profile/actions/{action_key}`
+keep only the policy, operator visibility and workflow templates. The former
+`/control-profile/inputs` and `/control-profile/inputs/prepare` endpoints, saved
+per-action key/gamepad mappings and the gamepad input feature have been removed;
+do not call or recreate them.
 
-Where supported, `POST /api/v1/twins/{uuid}/control-profile/inputs/prepare` requires
-`expected_revision` from the input composition review and `mode` (`live` or
-`simulate`). Optional device selection and handoff fields are described below. It returns a browser input snapshot after writer/environment access,
-version, mapping, conflict and selected policy-route checks. It does not assign a
-controller, start a worker or dispatch a command; it is not a control grant or an
-exclusive lease. Workbench's **Use saved mappings** selects it explicitly for one
-twin in this browser, keeping executable policy assignment separate. The existing
-keyboard runtime and transport handle operator keys. Mode changes pause it;
-restoring previous setup is explicit. Older clients retain their saved presets.
-Do not equate `configuration_ready` with physical readiness or successful execution.
-When provided, `keyboard_selection_ready` and each input's `selection_ready`
-describe eligibility for the selected device, while `configuration_ready` still
-describes the whole setup. A changed gamepad may need review while the keyboard
-remains usable. Use the backend result; do not infer eligibility by filtering
-warning text. Shared robot findings, unknown references and keyboard key conflicts
-remain blocking. Older services omit these fields and retain whole-setup gating.
-The prepare endpoint still validates the reviewed revision and runtime route;
-selection creates no new controller or asset/twin configuration document.
-The driver-based browser input releases holds on focus loss; keyboard repeat does
-not resume motion after pause or command reconnection. Release the held key and
-press again. Device templates alone do not imply a compatible input runtime is installed. A saved leader
-assignment permits keyboard/gamepad preparation only for a client implementing
-leader handoff version 1. Send `leader_handoff_version: 1` only when composition
-advertises `supports_leader_handoff`; otherwise retain the old-client path.
-Never claim that version on behalf of a client that cannot release its leader.
-Preparation sends no commands and retains the assignment. The Workbench pauses and releases its
-leader serial port when selecting a different input or changing mode/access.
-Restoring the leader requires an explicit Connect; late serial reads cannot resume
-publication. These browser lifecycle checks are not a cross-client actuator lease.
-Do not infer that all saved input types support action composition: leader
-references still use the existing assigned-input mapping/calibration path.
+
+### Keyboard customization (controller settings)
+
+Customize a controller for one robot or a whole environment without cloning it.
+`GET/PUT/DELETE /api/v1/{twins|environments}/{uuid}/controller-settings/{policy_uuid}`
+reads, saves or resets an override. Settings resolve in layers, the most specific
+first: twin ▸ environment ▸ asset ▸ controller. The GET returns this scope's
+override, its `revision` and the settings it resolves to. PUT takes `settings`
+and `expected_revision` (compare-and-swap); DELETE takes `expected_revision` as
+a query parameter and falls back to the next layer. A 409 means another edit
+landed: reload and review rather than replaying the old payload. Writes need
+write access on the twin or environment and only read access on the controller.
+Do not edit shared controller metadata or clone a controller to change one
+robot's keys; editing the controller itself is a catalog action (Duplicate).
+`PUT /api/v1/twins/{uuid}/keyboard-bindings` (above) remains the twin-level key
+editor and goes through the same resolver. Saving keys does not dispatch motion.
 
 
 ### Asset leader defaults
@@ -743,55 +780,6 @@ Calibration belongs to the assigned input on this twin; switching input or twin
 must release the old device and its volatile zero pose. Monitor remains read-only.
 
 
-### Typed gamepad composition (v4-capable services)
-
-Reuse the standard gamepad catalog reference; Drive, Camera and Lighting have
-separate action-local maps. Use the action's scoped command schema and shared
-argument validator. `gamepad_commands` bindings use `trigger` (button/index or
-axis/index/direction) plus `command`, `actuation`, and `args`. Do not put keyboard
-keys in gamepad maps or create robot-specific controller records. Axis inputs need
-continuous commands; optional `axis_argument` is a declared numeric parameter with
-reviewed zero/full-scale limits. Enable button/dead zone must agree across sections.
-
-Save v4 with optimistic revision checks. Retain unknown/legacy settings and do not
-downgrade v4 to earlier schemas. The input prepare endpoint can select an explicit
-`input_uuid` and freeze a version-2 gamepad snapshot for one browser session. It does
-not activate a robot, provision a worker, replace a policy or grant a device lease.
-Omitting the reference retains the keyboard path. Device selection and a neutral,
-fresh enable gesture remain necessary; no automatic resume after loss of focus or
-connection. Physical acceptance, scoped resource release and multi-action leader
-composition remain separate gates.
-
-
-### Gamepad joint targets
-
-When the action response advertises `supports_gamepad_joints`, reuse **Standard
-gamepad** for declared joint-position control. Save a v6 action mapping with
-`kind: gamepad_joint`, `joint_mode: position`, and button/axis triggers paired
-with `jointName` and `direction`. Reuse the target's independent joints and
-robot-owned mimic coupling. Never translate Cartesian coordinates into joint
-names, add keyboard keys to this mapping, or downgrade an existing v6 action.
-
-The same input can also have command maps on other actions. Shared settings and
-trigger conflicts apply across all its sections. To prepare a joint-capable input,
-send `gamepad_joint_version: 1` only when advertised; the returned v3 snapshot
-uses `gamepad_inputs` for its composed joint/command rows. Older clients must
-refuse that snapshot. Saving does not select a device or command motion. The
-browser retains enable/dead-zone, focus/release, joint limits and feedback checks.
-
-### Shared gamepad settings
-
-Read `/api/v1/{assets|twins}/{uuid}/control-profile/inputs` and require
-`supports_shared_input_settings` before PUT to that same endpoint. Supply its
-`expected_revision`, the saved gamepad's `input_uuid` and complete
-`settings: {enable_button, dead_zone}`. This updates every saved action map for
-that input atomically; do not rewrite each action or the shared preset in turn.
-Conflicts, unsupported maps and stale tokens require review. The save preserves
-existing dependency warnings and does not update an input already in use.
-When adding another action, reuse its option's `shared_gamepad_settings.settings`;
-an `issue` requires shared-settings review rather than guessing defaults.
-This endpoint is distinct from the assigned leader's `input-settings` endpoint.
-
 ### Input compatibility when robot setup changes
 
 Simulation success does not establish Live readiness. Respect the control
@@ -817,12 +805,12 @@ them to independent commands. Do not send a follower-only command or bypass a
 missing actuation declaration. Correct the catalog/twin setup or the motion.
 
 Use the capability's command availability and the input compatibility response
-before selecting a standard keyboard or gamepad. `command_interface_missing`
+before selecting a standard keyboard. `command_interface_missing`
 means the action has no declared command interface; creating another controller
 or remapping keys cannot repair it. Review the robot's supported driver commands.
-Saved maps remain available for inspection and explicit removal. Preserve them and
-the source preset on read; do not label every custom input deprecated or claim
-that a visible saved key certifies a runnable command.
+Preserve keyboard customizations and the source preset on read; do not label
+every custom input deprecated or claim that a visible saved key certifies a
+runnable command.
 
 Starting a new VLA inference workload requires an authenticated caller, even when the model is public. A sign-in error is an access issue; do not retry it as an adapter or robot-configuration repair. Public vision-model playground behavior is unchanged.
 
@@ -853,13 +841,13 @@ do not remove the frame flag to bypass the check.
 
 ### Named robot skills
 
-Skills are configured inside Asset Control and twin Workbench / Control, alongside existing capability tabs. Read the target's control profile and saved action draft before choosing an implementation. A declared skill has a versioned ID (`skill-…`), label and `input_contract`; a compatible policy advertises that descriptor in `metadata.skill` and the same `metadata.execution_contract`. Reuse existing action draft GET/PUT, revision checks and inheritance. A declaration alone is not runtime readiness.
+Skills are configured inside the asset's Controllers tab and twin Workbench → Controllers, alongside existing capability tabs. Read the target's control profile and saved action draft before choosing an implementation. A declared skill has a versioned ID (`skill-…`), label and `input_contract`; a compatible policy advertises that descriptor in `metadata.skill` and the same `metadata.execution_contract`. Reuse existing action draft GET/PUT, revision checks and inheritance. A declaration alone is not runtime readiness.
 
 Review a saved skill with the existing Control Agent `controller-policy` route and `saved_action: {action_key, revision}`. Preserve the returned plan ID when dispatching. Do not replace the robot's primary controller merely to run a named skill. Workflow lifecycle nodes can use `action_key` to select the same saved implementation. Keep unsupported robot/runtime adapters unavailable; the current robotics harness's real physics validation is Kinova/MuJoCo only.
 
 Use `cw_get_control_setup` or `cw_list_control_surfaces` to discover configured
 skills and their saved references, then pass that reference to
-`cw_resolve_control_route` with `route_id="controller-policy"`, target, mode and
+`cw_plan_control_action` with `route_id="controller-policy"`, target, mode and
 simulation backend. Only a ready plan can be dispatched. A skill label or catalog
 entry alone does not establish robot/runtime readiness.
 

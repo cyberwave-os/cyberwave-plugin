@@ -69,7 +69,7 @@ When present, use this read-only chain and stop as soon as the target is unambig
 2. `cw_list_projects` scoped to the chosen workspace
 3. `cw_list_environments` scoped to the chosen project
 4. `cw_get_environment_context` for the chosen/current environment
-5. `cw_resolve_twin` or `cw_list_twins` when a twin is needed
+5. `cw_list_environment_entities` (`entity_type: "twin"`, `name`) when a twin is needed
 
 Use a supplied UUID or full slug directly. Auto-select only when exactly one visible candidate exists. If several candidates match, present their names and stable identifiers and ask the user to choose.
 

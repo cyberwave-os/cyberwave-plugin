@@ -12,7 +12,7 @@ For live/edge workflows, confirm the target environment/twin and that edge requi
 
 ### Reuse a template
 
-1. Search with `cw_search_workflow_templates`.
+1. Search with `cw_list_workflows` (`query`).
 2. Inspect the selected workflow/template.
 3. Preview `cw_clone_workflow_template(execute=false)` into the target environment.
 4. Execute when the clone matches the request.
@@ -40,7 +40,15 @@ remaining setup instead of creating a replacement.
 ### Edit an existing workflow
 
 - Use `cw_update_workflow_fields` for name, description, activation, visibility, or metadata.
-- Use `cw_edit_workflow_from_prompt` for graph structure or node parameter changes.
+- Declare the run params a workflow accepts with `cw_update_workflow_fields(params_schema=[{name, type, default, required, description, options}])` (omit to leave as-is, `[]` clears). Nodes read them as `{{params.x}}`; declared defaults also apply to scheduled and MQTT-triggered runs. Do not put them in `metadata`: the declaration is owned by `params_schema`.
+- Use `cw_edit_workflow_from_prompt` for graph structure or node parameter changes described in natural language.
+  `execute=false` is a dry run and never writes (low-risk auto-apply needs `auto_apply=true`). An edit it cannot
+  ground returns `grounded=false` with `blocking_reasons` and is never applied. Responses are a summary; pass
+  `include_plan=true` only when you need the full planner payload.
+- Use `cw_edit_workflow_graph` when you know the exact graph: ordered `operations` (`insert_nodes`, `connect`,
+  `delete_node`, `rename_node`, `update_node_parameters`), no LLM, node order and repeated node types kept,
+  all-or-nothing with per-operation outcomes. `execute=false` validates and rolls back. Name nodes by uuid, a `ref`
+  from earlier in the same call, or an unambiguous exact name. Use `cw_get_node_schema` for exact types/parameters.
 - Resolve a real UUID first.
 - Preview continuity-sensitive, structural, active, or large edits and obtain explicit approval before `execute=true`.
 - Re-fetch the workflow and compare the resulting graph/fields with the requested change.
@@ -51,7 +59,7 @@ remaining setup instead of creating a replacement.
    the Environment's `control_plane_access`: `direct_control` forbids workflow
    execution through MCP/A2A, while `workflows` and
    `direct_control_and_workflows` allow it.
-2. Preview with `cw_trigger_workflow(execute=false)`.
+2. Preview with `cw_trigger_workflow(execute=false)`. Pass per-run values as `params` (validated against the workflow's `params_schema`); `inputs` stays the free-form payload.
 3. Trigger only when execution was requested.
 4. Capture the returned run UUID.
 5. Monitor with `cw_get_workflow_run` or bounded `cw_list_workflow_runs` checks until a terminal state or the user's requested observation window ends.
@@ -220,7 +228,7 @@ configuration in the existing editor. Check other workflow nodes' missing setup
 as well as the model inputs. A failed or stale request must not be retried by
 creating an unrelated second workflow.
 
-In Workbench Control, a saved workflow task can be enabled or paused through the
+In Workbench Controllers, a saved workflow task can be enabled or paused through the
 existing workflow lifecycle. Enable applies to the whole linked workflow and
 rechecks its readiness; it does not activate catalog templates. Keep model inference
 placement separate from sensor capture/workflow placement. Offer cloud only for a

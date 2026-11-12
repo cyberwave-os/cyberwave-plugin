@@ -66,16 +66,7 @@ Prefer `cw_edit_environment` for normal multi-object or intent-level scene edits
 
 For an ordinary world-space twin move, use a twin update/transform operation with top-level `position` and `rotation`; omit `attachment`. Use `attachment` only to dock the moving twin to a different parent twin and never set `parent_twin_uuid` to the moving `twin_uuid` itself.
 
-Use atomic tools when the task is narrow or the intent-level tool is unavailable:
-
-- `cw_add_twin_to_environment`
-- `cw_create_procedural_primitive`
-- `cw_create_area`
-- `cw_create_waypoint`
-- `cw_transform_environment_object`
-- `cw_update_environment_entity_properties`
-- `cw_resize_area`
-- `cw_set_area_image`
+Creating twins, procedural primitives, areas and waypoints, transforming or resizing them, and updating their properties are all `cw_edit_environment` operations; read them back with `cw_list_environment_entities`. Use `cw_set_area_image` for area images and `cw_delete_environment_object` for deletes.
 
 For catalog twins, use the `registry_id` returned by current MCP catalog search because that MCP contract explicitly accepts it. Give the twin an explicit position during creation when possible.
 
@@ -158,7 +149,7 @@ Delegate workflow composition through the existing workflow tools with exact
 scene, twin, waypoint and sensor IDs; keep the saved workflow ID when repairing
 setup. Inspect available control surfaces rather than inventing controller
 compatibility or key mappings. A manual workflow trigger, a controller policy
-and a keyboard/gamepad input binding are separate configuration outcomes.
+and a keyboard customization (controller settings) are separate configuration outcomes.
 Report each as configured, pending or unsupported. Saving a workflow does not
 mean that input bindings exist or that the workflow has run.
 
