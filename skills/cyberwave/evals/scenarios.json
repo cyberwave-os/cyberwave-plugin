@@ -119,6 +119,13 @@
       "expected_routes": ["mcp-and-fallbacks"],
       "required_decisions": ["validate_mcp_names", "update_canonical_source", "validate_single_skill_package", "publish_validated_distribution"],
       "forbidden_actions": ["release_unvalidated_copy", "ignore_distribution_drift"]
+    },
+    {
+      "id": "multi-camera-robot-driver",
+      "prompt": "Write the driver for our arm: it has a wrist USB camera, an RTSP camera on the base, and the vendor SDK gives us H.264 from a third camera.",
+      "expected_routes": ["driver-development"],
+      "required_decisions": ["confirm_cameras_are_sensors_of_the_arm_twin", "use_camera_stream_mixin_with_cameras_list", "camera_name_matches_sensor_id", "push_h264_from_vendor_callback_with_camera_name", "handle_failures_through_on_camera_status"],
+      "forbidden_actions": ["hand_written_capture_or_webrtc_loop", "decode_and_reencode_vendor_h264", "exit_driver_when_one_camera_fails", "enable_frame_filter_with_several_cameras"]
     }
   ]
 }

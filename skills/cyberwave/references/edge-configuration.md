@@ -2,7 +2,7 @@
 
 Read this for pairing an edge host, selecting an environment/twins, installing or updating Edge Core, configuring drivers/workers, transport setup, and edge diagnostics.
 
-These operations are normally CLI/host work, not hosted MCP work. MCP may create or resolve the environment and twins before the handoff and verify cloud-visible state afterward. Read the [verified CLI command map](cli-command-map.md) before emitting exact commands.
+These operations are normally CLI/host work, not hosted MCP work. MCP may create or resolve the environment and twins before the handoff and verify cloud-visible state afterward. `cw_get_hardware_setup` reports, per robot, whether it is paired and live, the next step with the exact commands to run on the device, the workspace's edges, and what the catalog can supply when the user has no such robot. `cw_manage_hardware` pairs or unpairs a robot with an edge that is already installed, restarts an edge core (previewed until `execute=true`), and prepares an order link the user confirms on the purchase page. Read the [verified CLI command map](cli-command-map.md) before emitting exact commands.
 
 ## Separate the layers
 
