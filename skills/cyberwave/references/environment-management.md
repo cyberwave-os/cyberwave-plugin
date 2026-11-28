@@ -66,16 +66,7 @@ Prefer `cw_edit_environment` for normal multi-object or intent-level scene edits
 
 For an ordinary world-space twin move, use a twin update/transform operation with top-level `position` and `rotation`; omit `attachment`. Use `attachment` only to dock the moving twin to a different parent twin and never set `parent_twin_uuid` to the moving `twin_uuid` itself.
 
-Use atomic tools when the task is narrow or the intent-level tool is unavailable:
-
-- `cw_add_twin_to_environment`
-- `cw_create_procedural_primitive`
-- `cw_create_area`
-- `cw_create_waypoint`
-- `cw_transform_environment_object`
-- `cw_update_environment_entity_properties`
-- `cw_resize_area`
-- `cw_set_area_image`
+Creating twins, procedural primitives, areas and waypoints, transforming or resizing them, and updating their properties are all `cw_edit_environment` operations; read them back with `cw_list_environment_entities`. Use `cw_set_area_image` for area images, `cw_set_primitive_texture` to put a library `preset` (a surface such as concrete, asphalt, painted_block, brick, floor_tiles, wood_planks or grass, or a prop image such as wooden_crate or steel_drum_blue, which restyles the primitive and brings the prop's color but does not create or resize it; an unknown key fails with the library keys that match its words) or an uploaded image on a texture-capable primitive (ground, box, work table, wall, cylinder and other templates whose parameters include `texture`; it stores the image and sets the primitive's `texture` parameter, so never write a `texture.attachment_id` by hand), and `cw_delete_environment_object` for deletes.
 
 For catalog twins, use the `registry_id` returned by current MCP catalog search because that MCP contract explicitly accepts it. Give the twin an explicit position during creation when possible.
 
@@ -88,7 +79,7 @@ keyboard after creation; that can invalidate the inherited setup. Explicit asset
 defaults remain supported. On older servers without this field, inspect the
 returned assignment and control profile instead of assuming inheritance.
 
-Use `snap`/`snap_target` against exact existing IDs for floors, tables, racks, or walls. Use overlap avoidance/clearance options where available instead of estimating repeated nudges.
+Use `snap`/`snap_target` against exact existing IDs for floors, tables, racks, or walls. A rack, shelf, cart or cabinet lists `support_levels` in the environment context (1 = lowest); add `level: N` to the snap target to land on that shelf instead of the top. Spatial feedback checks these primitives part by part, so an object standing on a shelf is not an overlap. Use overlap avoidance/clearance options where available instead of estimating repeated nudges.
 
 Keep template-specific scalar sizes under `parameters` (for example,
 `parameters: {"size": 0.15}` for a fiducial marker). Top-level `size`/`dimensions`
@@ -158,7 +149,7 @@ Delegate workflow composition through the existing workflow tools with exact
 scene, twin, waypoint and sensor IDs; keep the saved workflow ID when repairing
 setup. Inspect available control surfaces rather than inventing controller
 compatibility or key mappings. A manual workflow trigger, a controller policy
-and a keyboard/gamepad input binding are separate configuration outcomes.
+and a keyboard customization (controller settings) are separate configuration outcomes.
 Report each as configured, pending or unsupported. Saving a workflow does not
 mean that input bindings exist or that the workflow has run.
 
@@ -206,3 +197,50 @@ only a validated catalog object is published when public visibility was chosen.
 The photo UI requires a photo and permits optional context; appearance does not
 establish moving parts or physics. The current design planner uses the existing
 supported builders; unsupported geometry must remain explicit, never a silent box.
+
+## Move an environment between workspaces
+
+In the dashboard, open **Environment Settings** and choose **Workspace**, then
+**Save Changes**. Destinations are limited to the same organization, and the user
+must own or have an active admin/owner membership in both workspaces. Staff or
+organization administration alone does not grant this operation.
+
+The API exposes eligible destinations at `GET /api/v1/environments/{uuid}/move-destinations`.
+Use the standalone `PUT /api/v1/environments/{uuid}` with `workspace_uuid` plus
+`name` and `description` to move. Workspace-scoped API tokens must also permit the
+destination. Project routes cannot move environments across workspaces.
+
+A move preserves the environment UUID, contents, ownership, and explicit shares;
+workspace-based access follows the destination. It detaches the old project folder
+and changes environment, twin, and workflow slugs (adding a suffix on collision).
+Use the returned slug for navigation and update any saved slug references. Select
+a destination project separately after moving.
+
+## Move a single twin between environments
+
+In Edit mode, select a twin and use **Move to another environment** in its inspector.
+The destination must be in the same workspace. The caller needs write access to
+the twin, permission to remove twins from the source, and permission to add twins
+to the destination. This does not require workspace administration.
+
+`GET /api/v1/twins/{uuid}/move-destinations` lists eligible environments.
+`POST /api/v1/twins/{uuid}/move` accepts `environment_uuid` (destination) and
+`source_environment_uuid` (the last observed source, to reject stale moves).
+The generic twin PUT remains unable to change environments accidentally.
+
+The move preserves the twin UUID, slug, pose, asset, calibration, driver settings,
+explicit shares and twin-scoped overrides. It removes the twin from the old scene
+hierarchy. Environment-scoped settings and recorded history remain in their
+original environments. Undock the twin and any attached twins, clear workflow
+selections referencing it, and finish active runs in both environments first.
+Old source snapshots cannot reclaim a moved twin; move it back before restoring
+such a snapshot.
+
+Workspace moves also carry skill-teaching requests (including confirmed requests),
+partner tasks and asset-generation records. Catalog assets remain independently
+owned and are not transferred. Pending invitations associated with the environment
+are revoked: a source-workspace membership offer never becomes a destination offer.
+Unlink connectivity gateways and remove references from workflows outside the
+environment before moving. Gateways may serve other environments and do not move
+implicitly. Restoring an old snapshot cannot restore a project from another
+workspace or undo a workspace move.

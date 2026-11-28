@@ -12,7 +12,7 @@ For live/edge workflows, confirm the target environment/twin and that edge requi
 
 ### Reuse a template
 
-1. Search with `cw_search_workflow_templates`.
+1. Search with `cw_list_workflows` (`query`).
 2. Inspect the selected workflow/template.
 3. Preview `cw_clone_workflow_template(execute=false)` into the target environment.
 4. Execute when the clone matches the request.
@@ -40,7 +40,29 @@ remaining setup instead of creating a replacement.
 ### Edit an existing workflow
 
 - Use `cw_update_workflow_fields` for name, description, activation, visibility, or metadata.
-- Use `cw_edit_workflow_from_prompt` for graph structure or node parameter changes.
+- Declare the run params a workflow accepts with `cw_update_workflow_fields(params_schema=[{name, type, default, required, description, options}])` (omit to leave as-is, `[]` clears). A node's `expression` input mappings read them as `{params.x}` (a saved setting or a `value` mapping is literal text); declared defaults also apply to scheduled and MQTT-triggered runs. Do not put them in `metadata`: the declaration is owned by `params_schema`.
+- Use `cw_edit_workflow_from_prompt` for graph structure or node parameter changes described in natural language.
+  `execute=false` is a dry run and never writes (low-risk auto-apply needs `auto_apply=true`). An edit it cannot
+  ground returns `grounded=false` with `blocking_reasons` and is never applied. Responses are a summary; pass
+  `include_plan=true` only when you need the full planner payload.
+- Use `cw_edit_workflow_graph` when you know the exact graph: ordered `operations` (`insert_nodes`, `connect`,
+  `delete_node`, `rename_node`, `update_node_parameters`, `update_node_model`), no LLM, node order and repeated node
+  types kept, all-or-nothing with per-operation outcomes. `execute=false` validates and rolls back. Name nodes by their
+  `handle`, uuid, a `ref` from earlier in the same call, or an unambiguous exact name. Use `cw_get_node_schema` for
+  exact types/parameters.
+- Every node has a `handle` (a short snake_case name such as `http_request`; `cw_get_workflow` lists it, `insert_nodes`
+  returns it, and an inserted node's `ref` becomes its handle when valid and free). It does not change when the node is
+  renamed. To feed one node's output into another's input, pass `input_mappings` on `insert_nodes` or
+  `update_node_parameters`, e.g. an expression `"https://x/users/{http_request.response.userId}"` (`{handle.output.path}`;
+  cloud workflows only). A handle no node has is rejected with a suggestion; an output the node does not declare comes
+  back in the operation's `warnings`. Any mapping switches the node out of legacy pass-through (it no longer receives its
+  predecessor's whole output or `{var}` substitution in text fields).
+- A Call Model node's task (for example `detect_points`) is not a parameter: set it with `update_node_model`
+  (`{node, model?, task?}`, model by uuid or slug). A task alone keeps the node's selected model, and `task: null`
+  clears it. A model swap keeps the stored task contract that downstream nodes rely on: pass another task, or null,
+  when the new model lacks it; to adopt the new model's own declaration of the same task, clear it, then set it in a
+  following operation. If the node has no model, or the model lacks the task, the failed operation names up to five
+  models that offer it.
 - Resolve a real UUID first.
 - Preview continuity-sensitive, structural, active, or large edits and obtain explicit approval before `execute=true`.
 - Re-fetch the workflow and compare the resulting graph/fields with the requested change.
@@ -51,7 +73,7 @@ remaining setup instead of creating a replacement.
    the Environment's `control_plane_access`: `direct_control` forbids workflow
    execution through MCP/A2A, while `workflows` and
    `direct_control_and_workflows` allow it.
-2. Preview with `cw_trigger_workflow(execute=false)`.
+2. Preview with `cw_trigger_workflow(execute=false)`. Pass per-run values as `params` (validated against the workflow's `params_schema`); `inputs` stays the free-form payload.
 3. Trigger only when execution was requested.
 4. Capture the returned run UUID.
 5. Monitor with `cw_get_workflow_run` or bounded `cw_list_workflow_runs` checks until a terminal state or the user's requested observation window ends.
@@ -188,6 +210,103 @@ remains usable when no service is declared, but sensor availability alone does n
 prove that a mapping runtime is deployed. A depth-model task is not itself a SLAM
 provider.
 
+## Windows of stored readings
+
+To give a model more than one reading, use a Data Source node with `data_type`
+`metrics_window` (a twin's last readings per metric, live or from the dataset a
+replay feeds) or `dataset_window` (channels of a time-series dataset). Both
+output `series` as `{name: [oldest … newest]}`; map it to the model's input.
+
+- Metrics window settings: `twin_uuid` or `sensor_uuid` (the twin, or a Loop
+  item reference: see below), `metric_select` pick/all/type (`all` and `type` are
+  resolved per twin at run time, which suits a twin bound to a Loop item),
+  `metrics` (1-32, for pick), `metric_type` (a sensor type such as
+  `temperature`, for type), `window_readings` 1-100 (presets 10/30/60/100) or
+  `window_duration` 10-86400 s (presets 60/300/900/3600), `max_age_seconds`
+  10 s to 30 days, `source` auto/live/recorded, `read` last_n/since_last_run,
+  `min_new_readings` 1-1000.
+- A twin set as an input mapping (`sensor_uuid` or `twin_uuid`, as the editor
+  saves it) wins over a twin in parameters, and any setting saved as a mapping
+  wins over the same parameter. Parameters count only where no mapping sets
+  that input.
+- Dataset window settings: `dataset_uuid`, `select_by` channels (default) or
+  filter, then `channels` (1-32) or `filter` (`signal`, `thing`, `type`, `q`),
+  `range` last_n/between/step/since_last_run, `start` (required for between) and
+  `end` (last_n and between; default the dataset's last reading), `step_seconds`
+  10/60/600/3600/86400, `start_at` (step), `at_end` stop/loop, `replay_feed`
+  (required for since_last_run: a feed, or an environment whose replay is
+  playing or paused); `window_readings`, `window_duration` and
+  `max_age_seconds` take the same ranges as the Metrics window.
+- With `window_duration`, a Metrics window returns at most 100 readings per
+  metric; a Dataset window returns every reading of the span, up to 100,000
+  rows in all.
+- Sizes outside their range, and steps outside the presets, fail activation
+  naming the field and the allowed values; a Between range whose end is not
+  after its start or spans over 24 hours, or a filter matching no channel or
+  more than 32, also fail activation.
+- To score less often than the schedule, set `min_new_readings` and put a
+  Conditional on `ready` before the model. `ready` is always true on the first
+  run.
+- A Loop item, like any wired input, is an input mapping in the node's
+  `metadata.input_mappings`, not a parameter: `"twin_uuid": {"mode":
+  "reference", "source_node_uuid": "<loop uuid>", "source_output": "item"}`
+  (what the editor's From loop item writes; `sensor_uuid` is accepted too).
+  `cw_edit_workflow_graph` can write the same mapping through `input_mappings`
+  (`source_node` accepts a handle, uuid or ref); so can the editor or
+  `PUT /api/v1/workflows/{uuid}/nodes/{node_uuid}` with the node's whole
+  `metadata`. On edge, Loops take at most 64 copies in all.
+- To act on a score, use a Conditional and Send Alert; there is no node that
+  writes a reading back to the twin.
+- To read windows outside a workflow: `cw.twins.metrics_window(...)` and
+  `cw.datasets.window(...)` in the Python SDK.
+
+Docs: `docs-mintlify/feature-reference/workflows/data-windows.mdx`.
+
+## Batching live items (Buffer)
+
+For data that is not stored (MQTT bursts, camera frames), add a `buffer` node.
+It runs on edge only (`run_on_edge` must be on) and passes items on together:
+the nodes after it run once per batch, as their own execution.
+
+- Settings, fixed values only: `max_items` 2/4/8/16/32/64, `max_wait_seconds`
+  5/10/30/60/120/300, `quiet_seconds` 0 (off)/1/2/5/10/30, `single_item`
+  first/last/event/none (default: the event item in event mode, else first).
+- Event mode (`mode` = `event`): `pre_items` 0/1/2/3/4/8/16 kept before the
+  item whose `capture` is truthy, `post_items` 0/1/2/3/5/8/16/32 collected
+  after; `event_index` marks the event item. `capture` must be wired, as an
+  input mapping such as `{"mode": "reference", "source_node_uuid": "<detector
+  uuid>", "source_output": "detection_count"}`; Event mode without it fails
+  activation. In event mode `max_wait_seconds` counts from the event, and
+  `max_items` and `quiet_seconds` don't apply.
+- `keep_frames` (on by default after a camera frame trigger) keeps each item's
+  image as JPEG and outputs `frames`. An item without an image of its own (a
+  detector's output) keeps the frame of its run's Camera Frame trigger.
+- Call Model has no `frames` input yet. After a Buffer it reads one image,
+  `image_bytes`: the frame of the `single_item` item. A cloud model after a
+  Buffer is allowed on a Camera Frame path (it runs once per batch); before
+  the Buffer, Camera Frame paths need edge models.
+- Output: `items`, `first`, `last`, `count`, `dropped`, `dropped_batches`,
+  `window_start`, `window_end`, `flush_reason`, `frames`, `event_index`.
+- One trigger per workflow; no Buffer after a Buffer, inside a Loop, or before
+  a Loop or a node that runs on any input; nodes after a Buffer may read only
+  the Buffer and nodes before it; OpenCV, Barcode Reader, Spatial Filter and
+  Anonymize go before a Buffer fed by Camera Frame, not after it.
+- For stored data (metrics, datasets), use a data window instead: it works on
+  cloud too.
+
+Docs: `docs-mintlify/feature-reference/workflows/buffer.mdx`.
+
+A reference mapping's `source_output` can be a dot path into the output, on
+cloud and edge: `first.payload`, `items.0.payload`, `items.-1` (negative
+indices count from the end). An exact top-level key wins over a path.
+
+A Code node can keep state between runs on edge: `def run(input, state)`
+(chosen by the parameter count) gets a dict the edge worker keeps per node and
+loses on restart. Keep it under about 1 MB; it needs `run_on_edge` and is
+refused for cloud compiles. Use it for keyframe selection before a Buffer.
+`input` holds the outputs of the nodes wired directly into the Code node, so
+connect Camera Frame to it to read `frame_ts` past an embedding model.
+
 ## Completion evidence
 
 Return the workflow name/UUID, environment, mode, authoring path, important node chain, preview/execute state, and run UUID/status when triggered.
@@ -220,7 +339,7 @@ configuration in the existing editor. Check other workflow nodes' missing setup
 as well as the model inputs. A failed or stale request must not be retried by
 creating an unrelated second workflow.
 
-In Workbench Control, a saved workflow task can be enabled or paused through the
+In Workbench Controllers, a saved workflow task can be enabled or paused through the
 existing workflow lifecycle. Enable applies to the whole linked workflow and
 rechecks its readiness; it does not activate catalog templates. Keep model inference
 placement separate from sensor capture/workflow placement. Offer cloud only for a
