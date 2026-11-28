@@ -18,8 +18,9 @@ The shared adapter's body-velocity output port is simulation-only. The normal
 RL controller can select an explicitly frozen aerial output, but first requires
 the same action interface and exact twin binding plus a command-free, running
 plant audit. That worker report must match the lower-controller source hash,
-MuJoCo version, timestep and rotor-motor actuation; metadata or wrench fallback
-alone cannot satisfy it. Use a fresh simulation for this initial flight slice.
+plant engine version (MuJoCo, or Isaac Sim for `plant_backend: isaac`),
+timestep and rotor-motor actuation; metadata or wrench fallback alone cannot
+satisfy it. Use a fresh simulation for this initial flight slice.
 Unknown output adapters, physical execution and Zenoh command output still fail
 closed. A confirmed local drone job now has both held-out evaluation Replay and
 an automatically reported normal simulation deployment in the dashboard. This
@@ -149,7 +150,7 @@ from a session to retrieve its latest 200 log lines; logs require environment
 write access. Task/checkpoint/workload filters restrict retained reports, whose
 original evidence-source labels and hardware-approval flags are preserved.
 Capture available simulated camera frames separately with `cw_capture_frame`
-or `cw_capture_frames`, using `mock=false`.
+(pass `count` for a burst), using `mock=false`.
 
 For an episode reset, stop the current run with `cw_stop_simulation`, then use
 `cw_start_simulation`. Each start creates a fresh simulation workload/worker and
@@ -269,6 +270,18 @@ training version. Capture is limited to 4,096 steps and 4 MiB, with vector
 observations only; missing/incomplete capture, audit or upload is not a pass.
 Recording opt-out and current permissions apply. Neither the report nor its
 digest independently certifies the task-authored checks or enables hardware.
+
+On an Isaac plant the frozen deployment options name `plant_backend: isaac`. The
+controller then reads the Isaac audit (`isaac_plant_each_physics_step`), and
+`assess` receives `plant_backend` and `expected_isaac_sim`. The report carries
+`plant_isaac_sim` and `expected_isaac_sim` instead of the MuJoCo fields. Isaac
+contact sides are rigid-body USD paths (`.../twin_<hex>/Links/<link>`,
+`.../Primitives/procedural__<name>`), not geom names, so a check reads them by role.
+An `assess` that does not take `plant_backend` is refused on Isaac; it is never
+run as if the plant were MuJoCo. A MuJoCo-trained artifact pins no Isaac Sim
+version. On Isaac it therefore reports `runtime_version_match: false`, and a
+body-command policy is refused until it is retrained or re-promoted with that
+pin. This is a real mismatch, not a pass.
 
 The shared recorder additionally checks the measured plant timestep against
 `rl_policy.embodiment.physics_contract.physics_dt` in the frozen artifact.
