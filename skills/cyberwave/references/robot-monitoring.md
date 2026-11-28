@@ -20,7 +20,7 @@ Use the least expensive signal that answers the question.
 2. Use `cw_get_twin` for current twin summary/status.
 3. Use `cw_get_joint_states` for joints and `cw_get_schema` for a specific universal-schema path.
 4. Check `cw_list_environment_captures` before taking a new camera frame when recent workflow-produced evidence may suffice.
-5. Use `cw_capture_frame` for one current image or `cw_capture_frames` for a bounded burst (current MCP maximum is 10; inspect the schema).
+5. Use `cw_capture_frame` for one current image, or pass `count` (current MCP maximum is 10; inspect the schema) and `interval_ms` for a bounded burst.
 6. Use `cw_get_twin_metrics` for operational state (power, navigation, load, errors). It reads the current snapshot by default; pass `latest=false` only when a trend is needed.
 7. Use `cw_get_twin_logs` for what the driver itself reported, or `cw_get_environment_driver_logs` when the question spans twins. `level` is an exact match, not a minimum severity.
 8. Use `cw_get_twin_telemetry` for the structured event stream. It applies a default window when none is given and reports the window it used.

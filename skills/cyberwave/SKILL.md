@@ -34,7 +34,7 @@ Help the user reach a verified Cyberwave outcome. Use Cyberwave MCP tools when t
 | Configure an external SmolVLA policy, joint ordering or unit conversions | [Robot control](references/robot-control.md#external-smolvla-policy-setup) |
 | Install/use the CLI, pair an edge host, manage services/containers, configure media, diagnose host health | [Edge configuration](references/edge-configuration.md) and [verified CLI map](references/cli-command-map.md) |
 | Add a catalog asset, upload URDF, or define capabilities | [Asset and driver development](references/asset-and-driver-development.md) |
-| Create or update a hardware driver, manifest, transport, container, or dev twin | [Driver development](references/driver-development.md) |
+| Create or update a hardware driver (including camera and multi-camera robot drivers), manifest, transport, container, or dev twin | [Driver development](references/driver-development.md) |
 | Inspect schema, joints, telemetry, frames, streams, captures, runs, alerts, or edge state | [Robot monitoring](references/robot-monitoring.md) |
 | Decide what needs MCP versus CLI/SDK/dashboard, implement code, inspect docs, or recover from missing tools | [MCP, CLI, SDK, and dashboard routing](references/mcp-and-fallbacks.md) |
 
