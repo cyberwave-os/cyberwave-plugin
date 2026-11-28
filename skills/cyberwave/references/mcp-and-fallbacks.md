@@ -27,12 +27,12 @@ One task can cross planes. For example: MCP creates a development environment an
 
 Treat the client's callable tool list and tool schemas as authoritative for the current session. Tool families currently include:
 
-- context and resolution: `cw_list_workspaces`, `cw_list_projects`, `cw_list_environments`, `cw_get_environment_context`, `cw_list_environment_entities`, `cw_resolve_twin`
+- context and resolution: `cw_list_workspaces`, `cw_list_projects`, `cw_list_environments`, `cw_get_environment_context`, `cw_list_environment_entities`
 - catalog and scenes: `cw_list_primitives`, `cw_search_catalog`, `cw_edit_environment`, atomic environment tools, render/layout checks
 - workflows: template search/clone, prompt create/edit, node schemas, run lifecycle
 - RL authoring and deployment: `cw_inspect_rl_tasks` for list/context/source reads, `cw_author_rl_task` for previewed task/source/scene operations, and `cw_deploy_rl_policy` for signed checkpoint upload, registration, controller publication, guarded twin assignment, and previewed controller start/stop
 - remote labs: `cw_manage_remote_lab` for pool/session status plus previewed access request and session release; a confirmed live RL start additionally requires the active session for that twin's environment
-- control: `cw_list_control_surfaces`, `cw_plan_control_action`, `cw_resolve_control_route`, `cw_dispatch_control_action`
+- control: `cw_list_control_surfaces`, `cw_plan_control_action`, `cw_dispatch_control_action`
 - observation: twin/schema/joints, captures, frames, environment previews
 - documentation: `cw_search_docs`
 
@@ -41,7 +41,7 @@ Inspect parameters before calling. Current MCP schemas advertise durable entity 
 Deprecated interfaces must not be newly recommended:
 
 - `cw_list_assets` -> use `cw_search_catalog`
-- `cw_create_twin` -> use `cw_add_twin_to_environment`
+- `cw_create_twin` -> use `cw_edit_environment` with `op: create, kind: twin`
 - `cw_plan_scene` -> use `cw_edit_environment` for normal scene creation/editing
 
 ## MCP result discipline
@@ -60,7 +60,7 @@ Retry only when `retry_safe` is true and something relevant changed. Never turn 
 ## Selection order
 
 1. Cyberwave MCP for typed contextual platform operations.
-2. Python SDK for application code or operations not exposed through MCP.
+2. Python SDK for application code or operations not exposed through MCP; the official JavaScript SDK for custom browser/React interfaces after checking its release and backend availability.
 3. Cyberwave CLI for authentication plus host-local installation, pairing/bootstrap, service/container/media operations, diagnostics, and explicit CLI workflows.
 4. Dashboard for registration, identity, permissions, billing, visual/manual steps, or unsupported mutations.
 5. Verified REST/MQTT/Zenoh only for a lower-level integration requirement.
@@ -93,6 +93,8 @@ export CYBERWAVE_API_KEY="<secret>"
 ```
 
 Inspect the installed SDK or official docs before emitting methods. Use the SDK's simulation/live routing rather than manually changing source markers. Keep application setup code separate from edge driver code.
+
+For custom web interfaces, inspect [the JavaScript SDK guide](https://docs.cyberwave.com/overview/tools/javascript-sdk) and [cyberwave-node](https://github.com/cyberwave-os/cyberwave-node). The development SDK composes a generated REST client with optional `@cyberwave/react` and `@cyberwave/environment-3d` packages. Check installed package versions and backend preview endpoint availability before recommending a component. Reuse named environment/dataset/model browsers, workflow planning/monitoring, sensor video/telemetry and evidence review components; keep credentials owned by the host application and visualization separate from command dispatch. API-contract regeneration, component tests and tag releases are documented in the SDK's `docs/releases.md`.
 
 ## CLI baseline
 
